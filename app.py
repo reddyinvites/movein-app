@@ -3,22 +3,28 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # =========================
-# GOOGLE SHEETS CONNECT
+# GOOGLE CONNECT (FIXED)
 # =========================
-scope = ["https://spreadsheets.google.com/feeds",
-         "https://www.googleapis.com/auth/drive"]
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
 
 if "gcp" not in st.secrets:
     st.error("Missing GCP secrets")
     st.stop()
 
+gcp_info = dict(st.secrets["gcp"])
+gcp_info["private_key"] = gcp_info["private_key"].replace("\\n", "\n")
+
 creds = Credentials.from_service_account_info(
-    st.secrets["gcp"],
+    gcp_info,
     scopes=scope
 )
 
 client = gspread.authorize(creds)
 
+# 🔥 YOUR SHEET ID
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
 pg_sheet = sheet.sheet1
@@ -78,9 +84,6 @@ if st.session_state.mode == "user":
     if st.button("📍 I reached PG"):
         st.session_state.arrived = True
 
-    # =========================
-    # KITS
-    # =========================
     kits = {
         "basic": {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow"},
         "utility": {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug"},
@@ -104,9 +107,6 @@ if st.session_state.mode == "user":
             if key in st.session_state.selected:
                 del st.session_state.selected[key]
 
-        # =========================
-        # SHOW ITEMS
-        # =========================
         for key, kit in kits.items():
 
             st.subheader(kit["name"])
@@ -114,7 +114,6 @@ if st.session_state.mode == "user":
             st.write(f"₹{kit['price']}")
 
             disabled = False
-
             if key == "combo" and normal_selected:
                 disabled = True
             if key != "combo" and combo_selected:
@@ -131,9 +130,6 @@ if st.session_state.mode == "user":
 
             st.divider()
 
-        # =========================
-        # CART
-        # =========================
         if selected:
 
             total = sum(i["price"] for i in selected.values())
@@ -160,9 +156,6 @@ if st.session_state.mode == "user":
                 st.session_state.ordered = True
                 st.success("Order placed! Pay now 👇")
 
-        # =========================
-        # PAYMENT FLOW
-        # =========================
         if st.session_state.ordered:
 
             upi = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}&cu=INR"
@@ -176,7 +169,6 @@ if st.session_state.mode == "user":
             if file:
                 st.success("Uploaded! We will confirm shortly via WhatsApp 📲")
 
-                # RESET USER
                 st.session_state.selected = {}
                 st.session_state.arrived = False
                 st.session_state.ordered = False
@@ -213,13 +205,11 @@ if st.session_state.mode == "admin":
 
             col1, col2 = st.columns(2)
 
-            # APPROVE
             if o["status"] == "Pending":
                 if col1.button("Approve", key=f"a{i}"):
 
                     order_sheet.update_cell(i, 6, "Paid")
 
-                    # AUTO WHATSAPP
                     msg = f"Hi {o['name']}, your order is confirmed ✅"
                     wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
 
@@ -234,11 +224,8 @@ if st.session_state.mode == "admin":
                 wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
                 st.link_button("📲 WhatsApp", wa)
 
-            # CANCEL
             if col2.button("Cancel", key=f"c{i}"):
-
                 order_sheet.delete_rows(i)
-
                 st.error("Deleted")
                 st.rerun()
 

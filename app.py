@@ -1,148 +1,142 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
+from datetime import datetime
 
-# =========================
-# GOOGLE CONNECT (FIXED)
-# =========================
+# -----------------------
+# SESSION INIT
+# -----------------------
+if "page" not in st.session_state:
+    st.session_state.page = "home"
+
+if "cart" not in st.session_state:
+    st.session_state.cart = {}
+
+# -----------------------
+# GOOGLE SHEETS
+# -----------------------
 scope = [
-    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
-if "gcp" not in st.secrets:
-    st.error("Missing GCP secrets")
-    st.stop()
-
-gcp_info = dict(st.secrets["gcp"])
-gcp_info["private_key"] = gcp_info["private_key"].replace("\\n", "\n")
-
 creds = Credentials.from_service_account_info(
-    gcp_info,
+    st.secrets["gcp_service_account"],
     scopes=scope
 )
 
 client = gspread.authorize(creds)
-
-# 🔥 YOUR SHEET ID
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
 pg_sheet = sheet.sheet1
 order_sheet = sheet.worksheet("orders")
 
-# =========================
-# SESSION
-# =========================
-if "mode" not in st.session_state:
-    st.session_state.mode = None
+pg_data = pg_sheet.get_all_records()
 
-if "selected" not in st.session_state:
-    st.session_state.selected = {}
+# =====================
+# HOME
+# =====================
+if st.session_state.page == "home":
 
-if "arrived" not in st.session_state:
-    st.session_state.arrived = False
-
-if "ordered" not in st.session_state:
-    st.session_state.ordered = False
-
-
-# =========================
-# MODE SELECT
-# =========================
-if st.session_state.mode is None:
     st.title("🏠 Move-in Assistant")
 
     col1, col2 = st.columns(2)
 
     if col1.button("👤 User"):
-        st.session_state.mode = "user"
+        st.session_state.page = "user"
         st.rerun()
 
-    if col2.button("🧑‍💼 Admin"):
-        st.session_state.mode = "admin"
+    if col2.button("👨‍💼 Admin"):
+        st.session_state.page = "admin"
         st.rerun()
 
-
-# =========================
-# USER APP
-# =========================
-if st.session_state.mode == "user":
+# =====================
+# USER DASHBOARD
+# =====================
+elif st.session_state.page == "user":
 
     st.title("👤 User Dashboard")
 
-    name = st.text_input("", placeholder="Enter your name")
-    phone = st.text_input("", placeholder="+91XXXXXXXXXX")
-
-    pg_list = pg_sheet.get_all_records()
+    name = st.text_input("Name")
+    phone = st.text_input("Phone")
 
     selected_pg = st.selectbox(
         "Select PG",
-        pg_list,
+        pg_data,
         format_func=lambda x: f"{x['name']} - {x['location']}"
     )
 
     if st.button("📍 I reached PG"):
         st.session_state.arrived = True
+        st.rerun()
 
-    kits = {
-        "basic": {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow"},
-        "utility": {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug"},
-        "hygiene": {"name": "Hygiene Kit", "price": 129, "items": "Soap + Toothpaste"},
-        "combo": {"name": "Combo Kit", "price": 499, "items": "All included"}
-    }
-
-    if st.session_state.arrived:
+    if st.session_state.get("arrived"):
 
         st.success("Choose your essentials 👇")
 
-        selected = st.session_state.selected
+        cart = st.session_state.cart
 
-        combo_selected = "combo" in selected
-        normal_selected = any(k in selected for k in ["basic", "utility", "hygiene"])
+        products = {
+            "basic": {"name": "Basic Kit", "price": 249},
+            "utility": {"name": "Utility Kit", "price": 199},
+            "hygiene": {"name": "Hygiene Kit", "price": 129},
+            "combo": {"name": "Combo Kit", "price": 499}
+        }
 
-        def add_item(key):
-            st.session_state.selected[key] = kits[key]
+        combo_selected = "combo" in cart
+        others_selected = any(k in cart for k in ["basic","utility","hygiene"])
 
-        def remove_item(key):
-            if key in st.session_state.selected:
-                del st.session_state.selected[key]
+        # NORMAL ITEMS
+        for key in ["basic","utility","hygiene"]:
+            p = products[key]
 
-        for key, kit in kits.items():
+            st.write(f"{p['name']} - ₹{p['price']}")
 
-            st.subheader(kit["name"])
-            st.write(kit["items"])
-            st.write(f"₹{kit['price']}")
-
-            disabled = False
-            if key == "combo" and normal_selected:
-                disabled = True
-            if key != "combo" and combo_selected:
-                disabled = True
-
-            if key in selected:
-                if st.button(f"❌ Remove {kit['name']}", key=key):
-                    remove_item(key)
-                    st.rerun()
+            if combo_selected:
+                st.button("Add", disabled=True, key=f"d{key}")
             else:
-                if st.button(f"Add {kit['name']}", key=key, disabled=disabled):
-                    add_item(key)
+                if key in cart:
+                    if st.button("❌ Remove", key=f"r{key}"):
+                        del cart[key]
+                        st.rerun()
+                else:
+                    if st.button("Add", key=f"a{key}"):
+                        cart[key] = p
+                        st.rerun()
+
+        # COMBO
+        p = products["combo"]
+
+        st.write(f"🎁 Combo Kit - ₹{p['price']}")
+
+        if "combo" in cart:
+            if st.button("❌ Remove Combo"):
+                del cart["combo"]
+                st.rerun()
+        else:
+            if others_selected:
+                st.button("Add Combo", disabled=True)
+            else:
+                if st.button("Add Combo"):
+                    cart.clear()
+                    cart["combo"] = p
                     st.rerun()
 
-            st.divider()
+        st.divider()
 
-        if selected:
+        # CART
+        if cart:
+            total = sum(i["price"] for i in cart.values())
 
-            total = sum(i["price"] for i in selected.values())
-
-            st.subheader("🛒 Selected Items")
-            for i in selected.values():
-                st.write(f"{i['name']} - ₹{i['price']}")
+            st.write("🛒 Selected:")
+            for i in cart.values():
+                st.write(i["name"])
 
             st.write(f"### Total: ₹{total}")
 
-            if st.button("✅ Place Order"):
+            if st.button("Place Order"):
 
-                items = ", ".join(i["name"] for i in selected.values())
+                items = ", ".join([i["name"] for i in cart.values()])
 
                 order_sheet.append_row([
                     name,
@@ -150,83 +144,98 @@ if st.session_state.mode == "user":
                     selected_pg["name"],
                     items,
                     total,
-                    "Pending"
+                    "Pending",
+                    str(datetime.now())
                 ])
 
-                st.session_state.ordered = True
-                st.success("Order placed! Pay now 👇")
+                st.session_state.order_done = True
+                st.session_state.total = total
+                st.rerun()
 
-        if st.session_state.ordered:
+        # PAYMENT
+        if st.session_state.get("order_done"):
 
-            upi = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}&cu=INR"
+            total = st.session_state.total
+            upi = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
 
-            st.link_button("💰 Pay Now", upi)
+            st.success("Order placed!")
+            st.markdown(f"[💰 Pay Now]({upi})")
 
-            st.warning("Upload payment screenshot")
-
-            file = st.file_uploader("Upload Screenshot")
+            file = st.file_uploader("Upload Payment Screenshot")
 
             if file:
-                st.success("Uploaded! We will confirm shortly via WhatsApp 📲")
+                st.image(file)
+                st.success("Uploaded!")
+                st.info("⏳ We will confirm on WhatsApp shortly...")
 
-                st.session_state.selected = {}
-                st.session_state.arrived = False
-                st.session_state.ordered = False
-
+                st.session_state.clear()
+                st.session_state.page = "home"
                 st.rerun()
 
+# =====================
+# ADMIN DASHBOARD
+# =====================
+elif st.session_state.page == "admin":
 
-# =========================
-# ADMIN PANEL
-# =========================
-if st.session_state.mode == "admin":
+    st.title("👨‍💼 Admin Dashboard")
 
-    st.title("🧑‍💼 Admin Dashboard")
+    password = st.text_input("Password", type="password")
 
-    pwd = st.text_input("Password", type="password")
+    if password != "1234":
+        st.stop()
 
-    if pwd == "admin123":
+    # LOGOUT
+    if st.button("🚪 Logout"):
+        st.session_state.clear()
+        st.session_state.page = "home"
+        st.rerun()
 
-        if st.button("🚪 Logout"):
-            st.session_state.mode = None
+    st.divider()
+
+    # LOAD DATA
+    data = order_sheet.get_all_values()
+    headers = data[0]
+    rows = data[1:]
+
+    # REVERSE LOOP (IMPORTANT)
+    for i in reversed(range(len(rows))):
+
+        row_index = i + 2
+        o = dict(zip(headers, rows[i]))
+
+        st.write(f"👤 {o['name']} | 📞 {o['phone']}")
+        st.write(f"🛒 {o['items']} | ₹{o['total']}")
+
+        if o["status"] == "Pending":
+            st.warning("Pending")
+        elif o["status"] == "Paid":
+            st.success("Paid")
+
+        col1, col2 = st.columns(2)
+
+        # APPROVE → AUTO WHATSAPP
+        if col1.button("Approve", key=f"a{i}"):
+
+            order_sheet.update_cell(row_index, 6, "Paid")
+
+            msg = f"Hi {o['name']}, your Move-in order is confirmed ✅"
+            wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
+
+            st.success("Marked Paid")
+
+            # AUTO REDIRECT 🔥
+            st.markdown(f"""
+                <meta http-equiv="refresh" content="0;url={wa}">
+            """, unsafe_allow_html=True)
+
             st.rerun()
 
-        data = order_sheet.get_all_records()
+        # CANCEL = DELETE
+        if col2.button("Cancel", key=f"c{i}"):
 
-        for i, o in enumerate(data, start=2):
+            order_sheet.delete_rows(row_index)
 
-            st.write(f"👤 {o['name']} | {o['phone']}")
-            st.write(f"🛒 {o['items']} | ₹{o['total']}")
+            st.error("Order Deleted")
+            st.rerun()
 
-            if o["status"] == "Pending":
-                st.warning("Pending")
-            else:
-                st.success("Paid")
-
-            col1, col2 = st.columns(2)
-
-            if o["status"] == "Pending":
-                if col1.button("Approve", key=f"a{i}"):
-
-                    order_sheet.update_cell(i, 6, "Paid")
-
-                    msg = f"Hi {o['name']}, your order is confirmed ✅"
-                    wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
-
-                    st.markdown(f"""
-                        <meta http-equiv="refresh" content="0;url={wa}">
-                    """, unsafe_allow_html=True)
-
-                    st.rerun()
-
-            else:
-                msg = f"Hi {o['name']}, your order is confirmed ✅"
-                wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
-                st.link_button("📲 WhatsApp", wa)
-
-            if col2.button("Cancel", key=f"c{i}"):
-                order_sheet.delete_rows(i)
-                st.error("Deleted")
-                st.rerun()
-
-            st.divider()
+        st.divider()

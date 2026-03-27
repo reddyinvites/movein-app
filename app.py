@@ -16,6 +16,13 @@ if "payment_done" not in st.session_state:
     st.session_state.payment_done = False
 
 # -----------------------
+# ADMIN LOGIN
+# -----------------------
+st.sidebar.title("🔐 Admin Panel")
+admin_password = st.sidebar.text_input("Enter Password", type="password")
+is_admin = admin_password == "1234"   # 🔥 change this
+
+# -----------------------
 # GOOGLE SHEETS CONNECT
 # -----------------------
 scope = [
@@ -30,9 +37,6 @@ creds = Credentials.from_service_account_info(
 
 client = gspread.authorize(creds)
 
-# -----------------------
-# OPEN SHEET
-# -----------------------
 spreadsheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
 pg_sheet = spreadsheet.sheet1
@@ -51,6 +55,16 @@ st.write("Move in → Get essentials → Explore nearby")
 # -----------------------
 user_name = st.text_input("👤 Your Name")
 user_phone = st.text_input("📞 Phone Number")
+
+# -----------------------
+# PREVENT MULTIPLE ORDERS
+# -----------------------
+orders = order_sheet.get_all_records()
+existing_orders = [o for o in orders if o["phone"] == user_phone and o["status"] != "Cancelled"]
+
+if existing_orders and not is_admin:
+    st.warning("⚠️ You already placed an order. Wait for confirmation.")
+    st.stop()
 
 # -----------------------
 # SELECT PG
@@ -72,14 +86,14 @@ if not st.session_state.arrived:
         st.success("Welcome! Let's get you settled 👇")
 
 # -----------------------
-# MAIN CONTENT
+# USER APP
 # -----------------------
-if st.session_state.arrived:
+if st.session_state.arrived and not is_admin:
 
-    tab1, tab2, tab3 = st.tabs(["🛍️ Essentials", "📍 Nearby", "📜 Orders"])
+    tab1, tab2 = st.tabs(["🛍️ Essentials", "📍 Nearby"])
 
     # =====================
-    # 🛍️ ESSENTIALS
+    # ESSENTIALS
     # =====================
     with tab1:
 
@@ -92,10 +106,8 @@ if st.session_state.arrived:
 
         for kit in kits:
             col1, col2 = st.columns([3,1])
-
             with col1:
                 st.write(f"{kit['name']} - ₹{kit['price']}")
-
             with col2:
                 if st.button("Add", key=kit["name"]):
                     st.session_state.selected_categories[kit["category"]] = kit
@@ -117,14 +129,13 @@ if st.session_state.arrived:
 
                     items_text = ", ".join([i["name"] for i in cart])
 
-                    # SAVE ORDER
                     order_sheet.append_row([
                         user_name,
                         user_phone,
                         selected_pg["name"],
                         items_text,
                         total,
-                        "Pending Verification",
+                        "Pending",
                         str(datetime.now())
                     ])
 
@@ -135,33 +146,21 @@ if st.session_state.arrived:
 
                     st.session_state.payment_done = False
 
-        # -----------------------
-        # PAYMENT + SCREENSHOT
-        # -----------------------
+        # PAYMENT FLOW
         if "current_order" in st.session_state:
 
             total = st.session_state.current_order["total"]
             items_text = st.session_state.current_order["items"]
 
-            upi_id = "reddyinvites@okicici"
-            name = "MoveIn Services"
-
-            upi_link = f"upi://pay?pa={upi_id}&pn={name}&am={total}&cu=INR"
+            upi_link = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}&cu=INR"
 
             st.success("🧾 Order placed!")
 
-            # PAY BUTTON
             st.markdown(
                 f"""
                 <a href="{upi_link}">
-                    <button style="
-                        background-color:#28a745;
-                        color:white;
-                        padding:12px 20px;
-                        border:none;
-                        border-radius:8px;
-                        font-size:16px;">
-                        💰 Pay Now
+                    <button style="background-color:#28a745;color:white;padding:12px;border-radius:8px;">
+                    💰 Pay Now
                     </button>
                 </a>
                 """,
@@ -170,59 +169,64 @@ if st.session_state.arrived:
 
             st.warning("⚠️ After payment, upload screenshot")
 
-            # UPLOAD SCREENSHOT
-            st.markdown("### 📸 Upload Payment Screenshot")
+            file = st.file_uploader("📸 Upload Screenshot", type=["png","jpg","jpeg"])
 
-            payment_file = st.file_uploader("Upload screenshot", type=["png", "jpg", "jpeg"])
-
-            if payment_file:
-                st.image(payment_file, caption="Uploaded Screenshot", use_column_width=True)
-
-                st.success("✅ Screenshot uploaded! We will verify your payment.")
+            if file:
+                st.image(file)
+                st.success("✅ Uploaded! We will verify your payment.")
+                st.info("⏳ Please wait... we will confirm via WhatsApp shortly")
 
                 st.session_state.payment_done = True
+                st.session_state.selected_categories = {}
 
-            # WHATSAPP AFTER UPLOAD
             if st.session_state.payment_done:
+                msg = f"Hello {user_name}, I have paid ₹{total} for {items_text}"
+                wa = f"https://wa.me/{user_phone}?text={msg.replace(' ','%20')}"
 
-                message = f"Hello {user_name}, I have completed payment. PG: {selected_pg['name']}, Items: {items_text}, Total: ₹{total}"
-
-                whatsapp_url = f"https://wa.me/{user_phone}?text={message.replace(' ', '%20')}"
-
-                st.markdown(f"[📲 Confirm on WhatsApp]({whatsapp_url})")
+                if st.button("📲 Confirm on WhatsApp"):
+                    st.markdown(f"<meta http-equiv='refresh' content='0; url={wa}'>", unsafe_allow_html=True)
 
     # =====================
-    # 📍 NEARBY
+    # NEARBY
     # =====================
     with tab2:
-
         st.subheader(f"Nearby in {selected_location.title()}")
 
-        search_items = ["tiffins", "medical shop", "gym", "grocery"]
+        for item in ["tiffins","medical","gym","grocery"]:
+            url = f"https://www.google.com/maps/search/{item}+near+{selected_location}"
+            st.markdown(f"🔎 [{item.title()}]({url})")
 
-        for item in search_items:
-            query = f"{item} near {selected_location}"
-            maps_url = f"https://www.google.com/maps/search/{query.replace(' ', '+')}"
+# =====================
+# ADMIN DASHBOARD
+# =====================
+if is_admin:
 
-            st.markdown(f"### 🔎 {item.title()}")
-            st.markdown(f"[📍 Open in Maps]({maps_url})")
-            st.divider()
+    st.title("👨‍💼 Admin Dashboard")
 
-    # =====================
-    # 📜 ORDERS
-    # =====================
-    with tab3:
+    orders = order_sheet.get_all_records()
 
-        orders = order_sheet.get_all_records()
-        user_orders = [o for o in orders if o["phone"] == user_phone]
+    for i, o in enumerate(orders):
 
-        if user_orders:
-            for i, order in enumerate(user_orders):
+        st.write(f"👤 {o['name']} | 📞 {o['phone']}")
+        st.write(f"🏢 {o['pg']}")
+        st.write(f"🛒 {o['items']}")
+        st.write(f"💰 ₹{o['total']}")
+        st.write(f"📌 {o['status']}")
 
-                st.write(f"🧾 {order['items']} - ₹{order['total']}")
-                st.write(f"📍 {order['pg']}")
-                st.write(f"📌 Status: {order['status']}")
-                st.divider()
+        col1, col2 = st.columns(2)
 
-        else:
-            st.info("No orders found")
+        if col1.button("✅ Approve", key=f"a{i}"):
+            order_sheet.update_cell(i+2,6,"Approved")
+            st.success("Approved")
+
+        if col2.button("❌ Reject", key=f"r{i}"):
+            order_sheet.update_cell(i+2,6,"Rejected")
+            st.error("Rejected")
+
+        msg = f"Hello {o['name']}, your order is {o['status']}"
+        wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
+
+        if st.button("📲 WhatsApp User", key=f"w{i}"):
+            st.markdown(f"<meta http-equiv='refresh' content='0; url={wa}'>", unsafe_allow_html=True)
+
+        st.divider()

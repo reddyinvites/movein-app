@@ -80,42 +80,55 @@ elif st.session_state.page == "user":
             "basic": {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow"},
             "utility": {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug"},
             "hygiene": {"name": "Hygiene Kit", "price": 129, "items": "Soap + Toothpaste"},
-            "combo": {"name": "Combo Kit", "price": 449, "items": "All items included"}
+            "combo": {"name": "Combo Kit", "price": 499, "items": "All items included"}  # UPDATED
         }
 
         combo_selected = "combo" in cart
         others_selected = any(k in cart for k in ["basic","utility","hygiene"])
 
         # -----------------------
-        # UI
+        # NORMAL ITEMS
         # -----------------------
         for key in ["basic","utility","hygiene"]:
+
             p = products[key]
 
             st.markdown(f"### {p['name']}")
             st.write(p["items"])
             st.write(f"₹{p['price']}")
 
-            if key in cart:
-                if st.button(f"Remove {p['name']}", key=key):
-                    del cart[key]
-            else:
-                if st.button(f"Add {p['name']}", disabled=combo_selected, key=key):
-                    cart[key] = p
+            if combo_selected:
+                st.button(f"Add {p['name']}", disabled=True, key=f"d_{key}")
 
+            else:
+                if key in cart:
+                    if st.button(f"❌ Remove {p['name']}", key=f"r_{key}"):
+                        del cart[key]
+                else:
+                    if st.button(f"Add {p['name']}", key=f"a_{key}"):
+                        cart[key] = p
+
+        # -----------------------
         # COMBO
+        # -----------------------
         p = products["combo"]
-        st.markdown(f"### {p['name']}")
+
+        st.markdown(f"### 🎁 {p['name']}")
         st.write(p["items"])
         st.write(f"₹{p['price']}")
 
         if "combo" in cart:
-            if st.button("Remove Combo"):
+
+            if st.button("❌ Remove Combo"):
                 del cart["combo"]
+
         else:
-            if st.button("Add Combo", disabled=others_selected):
-                cart.clear()
-                cart["combo"] = p
+            if others_selected:
+                st.button("Add Combo", disabled=True)
+            else:
+                if st.button("Add Combo"):
+                    cart.clear()
+                    cart["combo"] = p
 
         st.divider()
 
@@ -170,7 +183,7 @@ elif st.session_state.page == "user":
 
                 st.info("⏳ We will confirm on WhatsApp in few seconds...")
 
-                # RESET FULL APP
+                # RESET
                 st.session_state.clear()
                 st.session_state.page = "home"
                 st.rerun()
@@ -199,12 +212,10 @@ elif st.session_state.page == "admin":
         elif o["status"] == "Paid":
             st.success("Paid")
 
-        # APPROVE
         if st.button("Approve", key=f"a{i}"):
 
             order_sheet.update_cell(i+2, 6, "Paid")
 
-            # WhatsApp message
             msg = f"Hello {o['name']}, your payment is confirmed!"
             wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
 

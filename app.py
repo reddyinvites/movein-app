@@ -16,7 +16,7 @@ if "arrived" not in st.session_state:
     st.session_state.arrived = False
 
 # -----------------------
-# GOOGLE SHEETS (SAFE)
+# GOOGLE SHEETS
 # -----------------------
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -70,7 +70,7 @@ elif st.session_state.page == "user":
     phone = st.text_input("Phone")
 
     if not pg_data:
-        st.warning("No PG data found")
+        st.warning("No PG data")
         st.stop()
 
     selected_pg = st.selectbox(
@@ -97,10 +97,10 @@ elif st.session_state.page == "user":
         }
 
         combo_selected = "combo" in cart
-        others_selected = any(k in cart for k in ["basic", "utility", "hygiene"])
+        others_selected = any(k in cart for k in ["basic","utility","hygiene"])
 
         # NORMAL ITEMS
-        for key in ["basic", "utility", "hygiene"]:
+        for key in ["basic","utility","hygiene"]:
             p = products[key]
 
             st.write(f"{p['name']} - ₹{p['price']}")
@@ -214,6 +214,7 @@ elif st.session_state.page == "admin":
         st.write(f"👤 {o['name']} | 📞 {o['phone']}")
         st.write(f"🛒 {o['items']} | ₹{o['total']}")
 
+        # STATUS
         if o["status"] == "Pending":
             st.warning("Pending")
         else:
@@ -221,22 +222,34 @@ elif st.session_state.page == "admin":
 
         col1, col2 = st.columns(2)
 
-        # APPROVE
-        if col1.button("Approve", key=f"a{i}"):
+        # APPROVE ONLY IF PENDING
+        if o["status"] == "Pending":
+            if col1.button("Approve", key=f"a{i}"):
 
-            order_sheet.update_cell(row_index, 6, "Paid")
+                order_sheet.update_cell(row_index, 6, "Paid")
 
+                st.success("Marked as Paid ✅")
+                st.rerun()
+
+        # WHATSAPP ONLY IF PAID
+        else:
             msg = f"Hello {o['name']}, your payment is confirmed!"
             wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
 
-            st.markdown(
-                f'<script>window.open("{wa}", "_blank");</script>',
-                unsafe_allow_html=True
-            )
+            st.markdown(f"""
+                <a href="{wa}" target="_blank">
+                    <button style="
+                        background-color:#25D366;
+                        color:white;
+                        padding:10px;
+                        border:none;
+                        border-radius:6px;">
+                        📲 Send WhatsApp
+                    </button>
+                </a>
+            """, unsafe_allow_html=True)
 
-            st.rerun()
-
-        # CANCEL
+        # CANCEL (ALWAYS)
         if col2.button("Cancel", key=f"c{i}"):
 
             order_sheet.delete_rows(row_index)

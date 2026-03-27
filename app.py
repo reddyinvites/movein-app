@@ -3,6 +3,7 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
+# -----------------------
 # SESSION STATE
 # -----------------------
 if "arrived" not in st.session_state:
@@ -12,33 +13,60 @@ if "selected_categories" not in st.session_state:
     st.session_state.selected_categories = {}
 
 # -----------------------
+# GOOGLE SHEETS CONNECT
+# -----------------------
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+creds = Credentials.from_service_account_info(
+    st.secrets["gcp_service_account"],
+    scopes=scope
+)
+
+client = gspread.authorize(creds)
+
+# LOAD PG DATA
+try:
+    sheet = client.open("pg_data").sheet1
+    data = sheet.get_all_records()
+    pg_data = data if isinstance(data, list) else []
+except:
+    pg_data = []
+
+# -----------------------
 # HEADER
 # -----------------------
 st.title("🏠 Move-in Assistant")
 st.write("Move in → Get essentials → Explore nearby")
 
-pg_data = [
-    {"name": "Sai PG", "location": "Ameerpet"},
-    {"name": "Comfort Stay", "location": "Madhapur"}
-]
-
 # -----------------------
-# SELECT PG (FROM SHEET)
+# SELECT PG
 # -----------------------
 if pg_data:
     selected_pg = st.selectbox(
         "🏢 Select Your PG",
         pg_data,
-        format_func=lambda x: f"{x['name']} ({x['location']})"
+        format_func=lambda x: f"{x['name']} - {x['location']} - ₹{x.get('price', 'N/A')}"
     )
 
     selected_location = selected_pg["location"].lower()
+
+    # SHOW DETAILS
+    st.markdown("### 📋 PG Details")
+    st.write(f"💰 Price: ₹{selected_pg.get('price', 'N/A')}")
+    st.write(f"🍽 Food: {selected_pg.get('food', 'N/A')}")
+    st.write(f"🛏 Room: {selected_pg.get('room_type', 'N/A')}")
+    st.write(f"⭐ Rating: {selected_pg.get('rating', 'N/A')}")
+    st.write(f"📞 Phone: {selected_pg.get('phone', 'N/A')}")
+
 else:
     st.error("No PG data found")
     st.stop()
 
 # -----------------------
-# NEARBY DATA (STATIC FOR NOW)
+# NEARBY DATA
 # -----------------------
 nearby_data = {
     "ameerpet": [

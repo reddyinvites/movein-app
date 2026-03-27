@@ -3,17 +3,12 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 
-# -----------------------
-# PAGE CONFIG
-# -----------------------
-st.set_page_config(page_title="Move-in Assistant", layout="wide")
-
-# -----------------------
-# GOOGLE SHEETS CONNECTION (SECURE)
-# -----------------------
 @st.cache_data
 def load_pg_data():
-    creds_dict = st.secrets["gcp"]
+    creds_dict = dict(st.secrets["gcp"])
+
+    # 🔥 IMPORTANT FIX
+    creds_dict["token_uri"] = "https://oauth2.googleapis.com/token"
 
     creds = Credentials.from_service_account_info(
         creds_dict,
@@ -29,6 +24,7 @@ def load_pg_data():
     data = sheet.get_all_records()
 
     return pd.DataFrame(data)
+
 
 df = load_pg_data()
 pg_list = df.to_dict(orient="records")

@@ -1,39 +1,51 @@
 import streamlit as st
 
-# Page config
+# -----------------------
+# PAGE CONFIG
+# -----------------------
 st.set_page_config(page_title="Move-in Assistant", layout="wide")
 
-# Session state
+# -----------------------
+# SESSION STATE
+# -----------------------
 if "arrived" not in st.session_state:
     st.session_state.arrived = False
 
-if "cart" not in st.session_state:
-    st.session_state.cart = []
+if "selected_categories" not in st.session_state:
+    st.session_state.selected_categories = {}
 
-# Header
+# -----------------------
+# HEADER
+# -----------------------
 st.title("🏠 Move-in Assistant")
 st.write("Move in → Get essentials → Explore nearby")
 
-# Arrival button
+# -----------------------
+# ARRIVAL BUTTON
+# -----------------------
 if not st.session_state.arrived:
     if st.button("📍 I reached PG"):
         st.session_state.arrived = True
         st.success("Welcome! Let's get you settled 👇")
 
-# Main content
+# -----------------------
+# MAIN CONTENT
+# -----------------------
 if st.session_state.arrived:
 
     tab1, tab2 = st.tabs(["🛍️ Essentials", "📍 Nearby Guide"])
 
-    # ---------------- Essentials ----------------
+    # =====================
+    # 🛍️ ESSENTIALS TAB
+    # =====================
     with tab1:
         st.subheader("Starter Kits")
 
         kits = [
-            {"name": "🛏️ Basic Kit", "price": 249, "items": "Bedsheet + Pillow"},
-            {"name": "🪣 Utility Kit", "price": 199, "items": "Bucket + Mug"},
-            {"name": "🧼 Hygiene Kit", "price": 129, "items": "Soap + Toothpaste + Detergent"},
-            {"name": "🎁 Combo Kit ⭐ (Best Value)", "price": 449, "items": "All items included"}
+            {"name": "🛏️ Basic Kit", "price": 249, "items": "Bedsheet + Pillow", "category": "basic"},
+            {"name": "🪣 Utility Kit", "price": 199, "items": "Bucket + Mug", "category": "utility"},
+            {"name": "🧼 Hygiene Kit", "price": 129, "items": "Soap + Toothpaste + Detergent", "category": "hygiene"},
+            {"name": "🎁 Combo Kit ⭐ (Best Value)", "price": 449, "items": "All items included", "category": "combo"}
         ]
 
         for kit in kits:
@@ -46,28 +58,46 @@ if st.session_state.arrived:
 
             with col2:
                 if st.button("Add", key=kit["name"]):
-                    st.session_state.cart.append(kit)
+                    # Only one per category
+                    st.session_state.selected_categories[kit["category"]] = kit
 
         st.divider()
 
-        # Cart
+        # -----------------------
+        # CART
+        # -----------------------
         st.subheader("🛒 Your Cart")
 
-        if st.session_state.cart:
+        cart_items = list(st.session_state.selected_categories.values())
+
+        if cart_items:
             total = 0
-            for item in st.session_state.cart:
-                st.write(f"{item['name']} - ₹{item['price']}")
+
+            for i, item in enumerate(cart_items):
+                col1, col2 = st.columns([3, 1])
+
+                with col1:
+                    st.write(f"{item['name']} - ₹{item['price']}")
+
+                with col2:
+                    if st.button("❌", key=f"remove_{i}"):
+                        del st.session_state.selected_categories[item["category"]]
+                        st.rerun()
+
                 total += item["price"]
 
             st.write(f"### Total: ₹{total}")
 
             if st.button("✅ Place Order"):
                 st.success("🎉 Order placed! Delivery on the way.")
-                st.session_state.cart = []
+                st.session_state.selected_categories = {}
+
         else:
             st.info("Cart is empty")
 
-    # ---------------- Nearby ----------------
+    # =====================
+    # 📍 NEARBY GUIDE TAB
+    # =====================
     with tab2:
         st.subheader("Nearby Essentials")
 

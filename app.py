@@ -4,7 +4,7 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 
 # -----------------------
-# SESSION
+# SESSION INIT
 # -----------------------
 if "page" not in st.session_state:
     st.session_state.page = "home"
@@ -166,7 +166,6 @@ elif st.session_state.page == "user":
             if file:
                 st.image(file)
                 st.success("Uploaded!")
-
                 st.info("⏳ We will confirm on WhatsApp shortly...")
 
                 st.session_state.clear()
@@ -185,28 +184,39 @@ elif st.session_state.page == "admin":
     if password != "1234":
         st.stop()
 
-    orders = order_sheet.get_all_records()
+    # LOGOUT
+    if st.button("🚪 Logout"):
+        st.session_state.clear()
+        st.session_state.page = "home"
+        st.rerun()
 
-    for i, o in enumerate(orders):
+    st.divider()
 
-        row = i + 2
+    # LOAD DATA
+    data = order_sheet.get_all_values()
+    headers = data[0]
+    rows = data[1:]
 
-        st.write(f"{o['name']} | {o['phone']}")
-        st.write(f"{o['items']} | ₹{o['total']}")
+    # REVERSE LOOP (IMPORTANT)
+    for i in reversed(range(len(rows))):
+
+        row_index = i + 2
+        o = dict(zip(headers, rows[i]))
+
+        st.write(f"👤 {o['name']} | 📞 {o['phone']}")
+        st.write(f"🛒 {o['items']} | ₹{o['total']}")
 
         if o["status"] == "Pending":
             st.warning("Pending")
         elif o["status"] == "Paid":
             st.success("Paid")
-        elif o["status"] == "Cancelled":
-            st.error("Cancelled")
 
         col1, col2 = st.columns(2)
 
         # APPROVE
         if col1.button("Approve", key=f"a{i}"):
 
-            order_sheet.update_cell(row, 6, "Paid")
+            order_sheet.update_cell(row_index, 6, "Paid")
 
             msg = f"Hello {o['name']}, your payment is confirmed!"
             wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
@@ -219,9 +229,12 @@ elif st.session_state.page == "admin":
 
             st.rerun()
 
-        # CANCEL
+        # CANCEL (DELETE)
         if col2.button("Cancel", key=f"c{i}"):
-            order_sheet.update_cell(row, 6, "Cancelled")
+
+            order_sheet.delete_rows(row_index)
+
+            st.error("Order Deleted")
             st.rerun()
 
         st.divider()

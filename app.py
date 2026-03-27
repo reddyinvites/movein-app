@@ -2,6 +2,7 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+import base64
 
 # -----------------------
 # SESSION INIT
@@ -13,7 +14,7 @@ if "cart" not in st.session_state:
     st.session_state.cart = {}
 
 # -----------------------
-# GOOGLE SHEETS
+# GOOGLE SHEETS SETUP
 # -----------------------
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -51,7 +52,7 @@ if st.session_state.page == "home":
         st.rerun()
 
 # =====================
-# 👤 USER
+# 👤 USER DASHBOARD
 # =====================
 elif st.session_state.page == "user":
 
@@ -76,7 +77,6 @@ elif st.session_state.page == "user":
 
         cart = st.session_state.cart
 
-        # PRODUCTS
         products = {
             "basic": {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow"},
             "utility": {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug"},
@@ -156,9 +156,11 @@ elif st.session_state.page == "user":
                     items,
                     total,
                     "Pending",
-                    str(datetime.now())
+                    str(datetime.now()),
+                    ""   # screenshot placeholder
                 ])
 
+                st.session_state.last_row = len(order_sheet.get_all_values())
                 st.session_state.order_done = True
                 st.session_state.total = total
                 st.rerun()
@@ -177,9 +179,15 @@ elif st.session_state.page == "user":
             file = st.file_uploader("Upload Payment Screenshot")
 
             if file:
+                image_bytes = file.read()
+                encoded = base64.b64encode(image_bytes).decode()
+
+                row = st.session_state.last_row
+                order_sheet.update_cell(row, 8, encoded)
+
                 st.image(file)
                 st.success("Uploaded!")
-                st.info("⏳ We will confirm on WhatsApp in few seconds...")
+                st.info("⏳ We will confirm on WhatsApp shortly...")
 
                 # RESET
                 st.session_state.clear()
@@ -187,7 +195,7 @@ elif st.session_state.page == "user":
                 st.rerun()
 
 # =====================
-# 👨‍💼 ADMIN
+# 👨‍💼 ADMIN DASHBOARD
 # =====================
 elif st.session_state.page == "admin":
 
@@ -202,22 +210,53 @@ elif st.session_state.page == "admin":
 
     for i, o in enumerate(orders):
 
-        st.write(f"{o['name']} | {o['phone']}")
-        st.write(f"{o['items']} | ₹{o['total']}")
+        row = i + 2
 
+        st.write(f"👤 {o['name']} | 📞 {o['phone']}")
+        st.write(f"🛒 {o['items']} | ₹{o['total']}")
+
+        # STATUS
         if o["status"] == "Pending":
             st.warning("Pending")
         elif o["status"] == "Paid":
             st.success("Paid")
+        elif o["status"] == "Cancelled":
+            st.error("Cancelled")
 
-        if st.button("Approve", key=f"a{i}"):
+        # -----------------------
+        # SHOW SCREENSHOT
+        # -----------------------
+        if o.get("screenshot"):
+            try:
+                img = base64.b64decode(o["screenshot"])
+                st.image(img, caption="Payment Screenshot")
+            except:
+                st.info("Image error")
 
-            order_sheet.update_cell(i+2, 6, "Paid")
+        col1, col2 = st.columns(2)
+
+        # APPROVE
+        if col1.button("✅ Approve", key=f"a{i}"):
+
+            order_sheet.update_cell(row, 6, "Paid")
 
             msg = f"Hello {o['name']}, your payment is confirmed!"
-            wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
+            wa_url = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
 
             st.success("Marked Paid")
-            st.markdown(f"[📲 Send WhatsApp]({wa})")
+
+            st.markdown(f"""
+                <script>
+                    window.open("{wa_url}", "_blank");
+                </script>
+            """, unsafe_allow_html=True)
+
+            st.rerun()
+
+        # CANCEL
+        if col2.button("❌ Cancel", key=f"c{i}"):
+            order_sheet.update_cell(row, 6, "Cancelled")
+            st.error("Order Cancelled")
+            st.rerun()
 
         st.divider()

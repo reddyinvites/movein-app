@@ -51,7 +51,7 @@ if st.session_state.page == "home":
         st.rerun()
 
 # =====================
-# USER
+# USER DASHBOARD
 # =====================
 elif st.session_state.page == "user":
 
@@ -173,7 +173,7 @@ elif st.session_state.page == "user":
                 st.rerun()
 
 # =====================
-# ADMIN
+# ADMIN DASHBOARD
 # =====================
 elif st.session_state.page == "admin":
 
@@ -213,23 +213,24 @@ elif st.session_state.page == "admin":
 
         col1, col2 = st.columns(2)
 
-        # APPROVE
+        # APPROVE → AUTO WHATSAPP
         if col1.button("Approve", key=f"a{i}"):
 
             order_sheet.update_cell(row_index, 6, "Paid")
 
-            msg = f"Hello {o['name']}, your payment is confirmed!"
+            msg = f"Hi {o['name']}, your Move-in order is confirmed ✅"
             wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
 
+            st.success("Marked Paid")
+
+            # AUTO REDIRECT 🔥
             st.markdown(f"""
-                <script>
-                    window.open("{wa}", "_blank");
-                </script>
+                <meta http-equiv="refresh" content="0;url={wa}">
             """, unsafe_allow_html=True)
 
             st.rerun()
 
-        # CANCEL (DELETE)
+        # CANCEL = DELETE
         if col2.button("Cancel", key=f"c{i}"):
 
             order_sheet.delete_rows(row_index)

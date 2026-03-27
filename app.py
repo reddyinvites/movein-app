@@ -1,33 +1,4 @@
-import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
-import pandas as pd
 
-@st.cache_data
-def load_pg_data():
-    creds_dict = dict(st.secrets["gcp"])
-
-    # 🔥 IMPORTANT FIX
-    creds_dict["token_uri"] = "https://oauth2.googleapis.com/token"
-
-    creds = Credentials.from_service_account_info(
-        creds_dict,
-        scopes=[
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ],
-    )
-
-    client = gspread.authorize(creds)
-
-    sheet = client.open("pg_data").sheet1
-    data = sheet.get_all_records()
-
-    return pd.DataFrame(data)
-
-
-df = load_pg_data()
-pg_list = df.to_dict(orient="records")
 
 # -----------------------
 # SESSION STATE

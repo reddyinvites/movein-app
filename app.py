@@ -28,32 +28,39 @@ creds = Credentials.from_service_account_info(
 client = gspread.authorize(creds)
 
 # -----------------------
-# LOAD PG DATA
-# -----------------------
-try:
-    sheet = client.open("pg_data").sheet1
-    pg_data = sheet.get_all_records()
-except Exception as e:
-    st.error(f"PG Load Error: {e}")
-    pg_data = []
-
-# -----------------------
-# LOAD ORDERS SHEET (NO CREATE)
+# LOAD SPREADSHEET
 # -----------------------
 try:
     spreadsheet = client.open("pg_data")
-
-sheet_names = [ws.title for ws in spreadsheet.worksheets()]
-
-st.write("Available sheets:", sheet_names)  # DEBUG
-
-if "orders" in sheet_names:
-    order_sheet = spreadsheet.worksheet("orders")
-else:
-    st.error("❌ 'orders' sheet not found. Check spelling.")
+except Exception as e:
+    st.error(f"❌ Cannot open sheet: {e}")
     st.stop()
-except:
-    st.error("❌ 'orders' sheet not found. Create it manually.")
+
+# -----------------------
+# LOAD PG DATA
+# -----------------------
+try:
+    pg_sheet = spreadsheet.sheet1
+    pg_data = pg_sheet.get_all_records()
+except Exception as e:
+    st.error(f"❌ PG Load Error: {e}")
+    pg_data = []
+
+# -----------------------
+# LOAD ORDERS SHEET (SAFE)
+# -----------------------
+try:
+    sheet_names = [ws.title for ws in spreadsheet.worksheets()]
+    # st.write("DEBUG:", sheet_names)  # optional debug
+
+    if "orders" in sheet_names:
+        order_sheet = spreadsheet.worksheet("orders")
+    else:
+        st.error("❌ 'orders' sheet not found. Create it manually.")
+        st.stop()
+
+except Exception as e:
+    st.error(f"❌ Sheet Error: {e}")
     st.stop()
 
 # -----------------------
@@ -63,7 +70,7 @@ st.title("🏠 Move-in Assistant")
 st.write("Move in → Get essentials → Explore nearby")
 
 # -----------------------
-# USER DETAILS
+# USER INPUT
 # -----------------------
 user_name = st.text_input("👤 Your Name")
 user_phone = st.text_input("📞 Phone Number")
@@ -103,10 +110,10 @@ if st.session_state.arrived:
     with tab1:
 
         kits = [
-            {"name": "🛏️ Basic Kit", "price": 249, "items": "Bedsheet + Pillow", "category": "basic"},
-            {"name": "🪣 Utility Kit", "price": 199, "items": "Bucket + Mug", "category": "utility"},
-            {"name": "🧼 Hygiene Kit", "price": 129, "items": "Soap + Toothpaste", "category": "hygiene"},
-            {"name": "🎁 Combo Kit", "price": 449, "items": "All items", "category": "combo"}
+            {"name": "🛏️ Basic Kit", "price": 249, "category": "basic"},
+            {"name": "🪣 Utility Kit", "price": 199, "category": "utility"},
+            {"name": "🧼 Hygiene Kit", "price": 129, "category": "hygiene"},
+            {"name": "🎁 Combo Kit", "price": 449, "category": "combo"}
         ]
 
         for kit in kits:
@@ -147,11 +154,11 @@ if st.session_state.arrived:
                         str(datetime.now())
                     ])
 
-                    st.success("🎉 Order placed!")
+                    st.success("🎉 Order placed successfully!")
                     st.session_state.selected_categories = {}
 
                 else:
-                    st.warning("Enter name & phone")
+                    st.warning("⚠️ Enter name & phone")
 
         else:
             st.info("Cart is empty")
@@ -160,6 +167,7 @@ if st.session_state.arrived:
     # 📍 NEARBY
     # =====================
     with tab2:
+
         st.subheader(f"Nearby in {selected_location}")
 
         nearby_data = {
@@ -170,15 +178,21 @@ if st.session_state.arrived:
 
         places = nearby_data.get(selected_location, [])
 
-        for place in places:
-            st.write(place)
+        if places:
+            for place in places:
+                st.write(place)
+        else:
+            st.info("No nearby data")
 
     # =====================
     # 📜 ORDERS
     # =====================
     with tab3:
 
-        orders = order_sheet.get_all_records()
+        try:
+            orders = order_sheet.get_all_records()
+        except:
+            orders = []
 
         user_orders = [o for o in orders if o["phone"] == user_phone]
 
@@ -192,11 +206,10 @@ if st.session_state.arrived:
                 if order["status"] == "Active":
                     if st.button("❌ Cancel", key=f"cancel_{i}"):
 
-                        # Find correct row
                         row_index = i + 2
                         order_sheet.update_cell(row_index, 6, "Cancelled")
 
-                        st.success("Cancelled")
+                        st.success("Cancelled successfully")
                         st.rerun()
 
                 st.divider()

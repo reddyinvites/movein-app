@@ -68,6 +68,7 @@ elif st.session_state.page == "user":
 
     if st.button("📍 I reached PG"):
         st.session_state.arrived = True
+        st.rerun()
 
     if st.session_state.get("arrived"):
 
@@ -80,7 +81,7 @@ elif st.session_state.page == "user":
             "basic": {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow"},
             "utility": {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug"},
             "hygiene": {"name": "Hygiene Kit", "price": 129, "items": "Soap + Toothpaste"},
-            "combo": {"name": "Combo Kit", "price": 499, "items": "All items included"}  # UPDATED
+            "combo": {"name": "Combo Kit", "price": 499, "items": "All items included"}
         }
 
         combo_selected = "combo" in cart
@@ -90,7 +91,6 @@ elif st.session_state.page == "user":
         # NORMAL ITEMS
         # -----------------------
         for key in ["basic","utility","hygiene"]:
-
             p = products[key]
 
             st.markdown(f"### {p['name']}")
@@ -99,14 +99,15 @@ elif st.session_state.page == "user":
 
             if combo_selected:
                 st.button(f"Add {p['name']}", disabled=True, key=f"d_{key}")
-
             else:
                 if key in cart:
                     if st.button(f"❌ Remove {p['name']}", key=f"r_{key}"):
                         del cart[key]
+                        st.rerun()
                 else:
                     if st.button(f"Add {p['name']}", key=f"a_{key}"):
                         cart[key] = p
+                        st.rerun()
 
         # -----------------------
         # COMBO
@@ -118,10 +119,9 @@ elif st.session_state.page == "user":
         st.write(f"₹{p['price']}")
 
         if "combo" in cart:
-
             if st.button("❌ Remove Combo"):
                 del cart["combo"]
-
+                st.rerun()
         else:
             if others_selected:
                 st.button("Add Combo", disabled=True)
@@ -129,6 +129,7 @@ elif st.session_state.page == "user":
                 if st.button("Add Combo"):
                     cart.clear()
                     cart["combo"] = p
+                    st.rerun()
 
         st.divider()
 
@@ -136,11 +137,9 @@ elif st.session_state.page == "user":
         # CART
         # -----------------------
         if cart:
-
             total = sum(i["price"] for i in cart.values())
 
             st.subheader("🛒 Selected Items")
-
             for i in cart.values():
                 st.write(f"{i['name']} - ₹{i['price']}")
 
@@ -162,6 +161,7 @@ elif st.session_state.page == "user":
 
                 st.session_state.order_done = True
                 st.session_state.total = total
+                st.rerun()
 
         # -----------------------
         # PAYMENT
@@ -172,7 +172,6 @@ elif st.session_state.page == "user":
             upi = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
 
             st.success("Order placed!")
-
             st.markdown(f"[💰 Pay Now]({upi})")
 
             file = st.file_uploader("Upload Payment Screenshot")
@@ -180,7 +179,6 @@ elif st.session_state.page == "user":
             if file:
                 st.image(file)
                 st.success("Uploaded!")
-
                 st.info("⏳ We will confirm on WhatsApp in few seconds...")
 
                 # RESET

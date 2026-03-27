@@ -41,7 +41,17 @@ except Exception as e:
 # LOAD ORDERS SHEET (NO CREATE)
 # -----------------------
 try:
-    order_sheet = client.open("pg_data").worksheet("orders")
+    spreadsheet = client.open("pg_data")
+
+sheet_names = [ws.title for ws in spreadsheet.worksheets()]
+
+st.write("Available sheets:", sheet_names)  # DEBUG
+
+if "orders" in sheet_names:
+    order_sheet = spreadsheet.worksheet("orders")
+else:
+    st.error("❌ 'orders' sheet not found. Check spelling.")
+    st.stop()
 except:
     st.error("❌ 'orders' sheet not found. Create it manually.")
     st.stop()

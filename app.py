@@ -16,35 +16,31 @@ if "arrived" not in st.session_state:
     st.session_state.arrived = False
 
 # -----------------------
-# GOOGLE SHEETS
+# GOOGLE SHEETS FIXED
 # -----------------------
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
-try:
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scope
-    )
+gcp_info = dict(st.secrets["gcp_service_account"])
 
-    client = gspread.authorize(creds)
+# 🔥 IMPORTANT FIX
+gcp_info["private_key"] = gcp_info["private_key"].replace("\\n", "\n")
 
-    sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
+creds = Credentials.from_service_account_info(gcp_info, scopes=scope)
+client = gspread.authorize(creds)
 
-    pg_sheet = sheet.sheet1
-    order_sheet = sheet.worksheet("orders")
+sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
-    pg_data = pg_sheet.get_all_records()
+pg_sheet = sheet.sheet1
+order_sheet = sheet.worksheet("orders")
 
-except:
-    st.error("❌ Google Sheets connection failed")
-    st.stop()
+pg_data = pg_sheet.get_all_records()
 
-# -----------------------
+# =====================
 # HOME
-# -----------------------
+# =====================
 if st.session_state.page == "home":
 
     st.title("🏠 Move-in Assistant")
@@ -59,19 +55,15 @@ if st.session_state.page == "home":
         st.session_state.page = "admin"
         st.rerun()
 
-# -----------------------
-# USER
-# -----------------------
+# =====================
+# USER DASHBOARD
+# =====================
 elif st.session_state.page == "user":
 
     st.title("👤 User Dashboard")
 
     name = st.text_input("Name")
     phone = st.text_input("Phone")
-
-    if not pg_data:
-        st.warning("No PG data")
-        st.stop()
 
     selected_pg = st.selectbox(
         "Select PG",
@@ -109,16 +101,17 @@ elif st.session_state.page == "user":
                 st.button("Add", disabled=True, key=f"d{key}")
             else:
                 if key in cart:
-                    if st.button(f"❌ Remove {p['name']}", key=f"r{key}"):
+                    if st.button("❌ Remove", key=f"r{key}"):
                         del cart[key]
                         st.rerun()
                 else:
-                    if st.button(f"Add {p['name']}", key=f"a{key}"):
+                    if st.button("Add", key=f"a{key}"):
                         cart[key] = p
                         st.rerun()
 
         # COMBO
-        st.write("🎁 Combo Kit - ₹499")
+        p = products["combo"]
+        st.write(f"🎁 Combo Kit - ₹{p['price']}")
 
         if "combo" in cart:
             if st.button("❌ Remove Combo"):
@@ -130,7 +123,7 @@ elif st.session_state.page == "user":
             else:
                 if st.button("Add Combo"):
                     cart.clear()
-                    cart["combo"] = products["combo"]
+                    cart["combo"] = p
                     st.rerun()
 
         st.divider()
@@ -176,16 +169,20 @@ elif st.session_state.page == "user":
 
             if file:
                 st.image(file)
-                st.success("Uploaded!")
-                st.info("⏳ We will confirm on WhatsApp shortly...")
 
-                st.session_state.clear()
-                st.session_state.page = "home"
-                st.rerun()
+                st.success("✅ Upload successful!")
+                st.info("📲 Your payment will be verified and you will receive a confirmation message on WhatsApp within a few minutes.")
 
-# -----------------------
-# ADMIN
-# -----------------------
+                st.divider()
+
+                if st.button("🚪 Logout"):
+                    st.session_state.clear()
+                    st.session_state.page = "home"
+                    st.rerun()
+
+# =====================
+# ADMIN DASHBOARD
+# =====================
 elif st.session_state.page == "admin":
 
     st.title("👨‍💼 Admin Dashboard")
@@ -214,47 +211,33 @@ elif st.session_state.page == "admin":
         st.write(f"👤 {o['name']} | 📞 {o['phone']}")
         st.write(f"🛒 {o['items']} | ₹{o['total']}")
 
-        # STATUS
         if o["status"] == "Pending":
             st.warning("Pending")
-        else:
+        elif o["status"] == "Paid":
             st.success("Paid")
 
         col1, col2 = st.columns(2)
 
-        # APPROVE ONLY IF PENDING
+        # APPROVE BUTTON ONLY FOR PENDING
         if o["status"] == "Pending":
             if col1.button("Approve", key=f"a{i}"):
 
                 order_sheet.update_cell(row_index, 6, "Paid")
 
-                st.success("Marked as Paid ✅")
+                msg = f"Hello {o['name']}, your payment is confirmed!"
+                wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
+
+                st.markdown(f"""
+                    <script>
+                        window.open("{wa}", "_blank");
+                    </script>
+                """, unsafe_allow_html=True)
+
                 st.rerun()
 
-        # WHATSAPP ONLY IF PAID
-        else:
-            msg = f"Hello {o['name']}, your payment is confirmed!"
-            wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
-
-            st.markdown(f"""
-                <a href="{wa}" target="_blank">
-                    <button style="
-                        background-color:#25D366;
-                        color:white;
-                        padding:10px;
-                        border:none;
-                        border-radius:6px;">
-                        📲 Send WhatsApp
-                    </button>
-                </a>
-            """, unsafe_allow_html=True)
-
-        # CANCEL (ALWAYS)
+        # CANCEL
         if col2.button("Cancel", key=f"c{i}"):
-
             order_sheet.delete_rows(row_index)
-
-            st.error("Order Deleted")
             st.rerun()
 
         st.divider()

@@ -23,7 +23,7 @@ st.write("Move in → Get essentials → Explore nearby")
 if pg_data:
     selected_pg = st.selectbox(
         "🏢 Select Your PG",
-        pg_list,
+        pg_data,
         format_func=lambda x: f"{x['name']} ({x['location']})"
     )
 

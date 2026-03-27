@@ -57,7 +57,6 @@ elif st.session_state.page == "user":
 
     st.title("👤 User Dashboard")
 
-    # WATERMARK INPUTS
     name = st.text_input("Name", placeholder="Enter your name")
     phone = st.text_input("Phone", placeholder="+91XXXXXXXXXX")
 
@@ -67,91 +66,82 @@ elif st.session_state.page == "user":
         format_func=lambda x: f"{x['name']} - {x['location']}"
     )
 
-    if "arrived" not in st.session_state:
-        st.session_state.arrived = False
-
     if st.button("📍 I reached PG"):
         st.session_state.arrived = True
 
-    if st.session_state.arrived:
+    if st.session_state.get("arrived"):
 
-        st.success("Welcome! Choose your essentials 👇")
+        st.success("Choose your essentials 👇")
 
         cart = st.session_state.cart
 
         # PRODUCTS
-        basic = {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow"}
-        utility = {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug"}
-        hygiene = {"name": "Hygiene Kit", "price": 129, "items": "Soap + Toothpaste + Detergent"}
-        combo = {"name": "Combo Kit", "price": 449, "items": "All items included"}
+        products = {
+            "basic": {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow"},
+            "utility": {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug"},
+            "hygiene": {"name": "Hygiene Kit", "price": 129, "items": "Soap + Toothpaste"},
+            "combo": {"name": "Combo Kit", "price": 449, "items": "All items included"}
+        }
 
-        # LOGIC
         combo_selected = "combo" in cart
-        others_selected = ("basic" in cart or "utility" in cart or "hygiene" in cart)
+        others_selected = any(k in cart for k in ["basic","utility","hygiene"])
 
-        # FIX MIXING
-        if combo_selected:
-            cart.pop("basic", None)
-            cart.pop("utility", None)
-            cart.pop("hygiene", None)
+        # -----------------------
+        # UI
+        # -----------------------
+        for key in ["basic","utility","hygiene"]:
+            p = products[key]
 
-        if others_selected:
-            cart.pop("combo", None)
+            st.markdown(f"### {p['name']}")
+            st.write(p["items"])
+            st.write(f"₹{p['price']}")
 
-        col1, col2 = st.columns(2)
+            if key in cart:
+                if st.button(f"Remove {p['name']}", key=key):
+                    del cart[key]
+            else:
+                if st.button(f"Add {p['name']}", disabled=combo_selected, key=key):
+                    cart[key] = p
 
-        # LEFT SIDE
-        with col1:
+        # COMBO
+        p = products["combo"]
+        st.markdown(f"### {p['name']}")
+        st.write(p["items"])
+        st.write(f"₹{p['price']}")
 
-            st.markdown("### 🛏️ Basic Kit")
-            st.write("Bedsheet + Pillow")
-            st.write("₹249")
-            if st.button("Add Basic", disabled=combo_selected):
-                cart["basic"] = basic
-
-            st.markdown("### 🪣 Utility Kit")
-            st.write("Bucket + Mug")
-            st.write("₹199")
-            if st.button("Add Utility", disabled=combo_selected):
-                cart["utility"] = utility
-
-            st.markdown("### 🧼 Hygiene Kit")
-            st.write("Soap + Toothpaste + Detergent")
-            st.write("₹129")
-            if st.button("Add Hygiene", disabled=combo_selected):
-                cart["hygiene"] = hygiene
-
-        # RIGHT SIDE
-        with col2:
-
-            st.markdown("### 🎁 Combo Kit")
-            st.write("All items included")
-            st.write("₹449")
+        if "combo" in cart:
+            if st.button("Remove Combo"):
+                del cart["combo"]
+        else:
             if st.button("Add Combo", disabled=others_selected):
                 cart.clear()
-                cart["combo"] = combo
+                cart["combo"] = p
 
         st.divider()
 
+        # -----------------------
         # CART
+        # -----------------------
         if cart:
-            total = sum(item["price"] for item in cart.values())
+
+            total = sum(i["price"] for i in cart.values())
 
             st.subheader("🛒 Selected Items")
-            for item in cart.values():
-                st.write(f"{item['name']} - ₹{item['price']}")
+
+            for i in cart.values():
+                st.write(f"{i['name']} - ₹{i['price']}")
 
             st.write(f"### Total: ₹{total}")
 
-            if st.button("✅ Place Order"):
+            if st.button("Place Order"):
 
-                items_text = ", ".join([i["name"] for i in cart.values()])
+                items = ", ".join([i["name"] for i in cart.values()])
 
                 order_sheet.append_row([
                     name,
                     phone,
                     selected_pg["name"],
-                    items_text,
+                    items,
                     total,
                     "Pending",
                     str(datetime.now())
@@ -160,39 +150,30 @@ elif st.session_state.page == "user":
                 st.session_state.order_done = True
                 st.session_state.total = total
 
+        # -----------------------
         # PAYMENT
+        # -----------------------
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
             upi = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
 
-            st.success("🧾 Order placed!")
+            st.success("Order placed!")
 
             st.markdown(f"[💰 Pay Now]({upi})")
 
-            st.warning("⚠️ After payment, upload screenshot")
-
-            file = st.file_uploader("📸 Upload Screenshot", type=["png","jpg","jpeg"])
+            file = st.file_uploader("Upload Payment Screenshot")
 
             if file:
                 st.image(file)
-                st.success("✅ Uploaded!")
+                st.success("Uploaded!")
 
-                st.info("""
-⏳ We will verify your payment.
+                st.info("⏳ We will confirm on WhatsApp in few seconds...")
 
-We will confirm on WhatsApp shortly.
-""")
-
-                # RESET + LOGOUT
+                # RESET FULL APP
                 st.session_state.clear()
                 st.session_state.page = "home"
                 st.rerun()
-
-    if st.button("🚪 Logout"):
-        st.session_state.clear()
-        st.session_state.page = "home"
-        st.rerun()
 
 # =====================
 # 👨‍💼 ADMIN
@@ -204,31 +185,30 @@ elif st.session_state.page == "admin":
     password = st.text_input("Password", type="password")
 
     if password != "1234":
-        st.warning("Enter correct password")
         st.stop()
 
     orders = order_sheet.get_all_records()
 
     for i, o in enumerate(orders):
 
-        st.write(f"👤 {o['name']} | 📞 {o['phone']}")
-        st.write(f"🛒 {o['items']}")
-        st.write(f"💰 ₹{o['total']}")
+        st.write(f"{o['name']} | {o['phone']}")
+        st.write(f"{o['items']} | ₹{o['total']}")
 
-        status = o["status"]
-
-        if status == "Pending":
+        if o["status"] == "Pending":
             st.warning("Pending")
-        elif status == "Paid":
+        elif o["status"] == "Paid":
             st.success("Paid")
 
-        if st.button("✅ Approve Payment", key=f"a{i}"):
+        # APPROVE
+        if st.button("Approve", key=f"a{i}"):
+
             order_sheet.update_cell(i+2, 6, "Paid")
-            st.success("Updated to PAID")
+
+            # WhatsApp message
+            msg = f"Hello {o['name']}, your payment is confirmed!"
+            wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
+
+            st.success("Marked Paid")
+            st.markdown(f"[📲 Send WhatsApp]({wa})")
 
         st.divider()
-
-    if st.button("🚪 Logout"):
-        st.session_state.clear()
-        st.session_state.page = "home"
-        st.rerun()

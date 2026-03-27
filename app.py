@@ -31,7 +31,7 @@ client = gspread.authorize(creds)
 # LOAD SPREADSHEET
 # -----------------------
 try:
-    spreadsheet = client.open("pg_data")
+    spreadsheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 except Exception as e:
     st.error(f"❌ Cannot open sheet: {e}")
     st.stop()

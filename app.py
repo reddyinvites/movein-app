@@ -20,7 +20,7 @@ st.write("Move in → Get essentials → Explore nearby")
 # -----------------------
 # SELECT PG (FROM SHEET)
 # -----------------------
-if pg_list:
+if pg_data:
     selected_pg = st.selectbox(
         "🏢 Select Your PG",
         pg_list,

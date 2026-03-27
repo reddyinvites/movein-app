@@ -1,9 +1,37 @@
 import streamlit as st
+import gspread
+from google.oauth2.service_account import Credentials
+import pandas as pd
 
 # -----------------------
 # PAGE CONFIG
 # -----------------------
 st.set_page_config(page_title="Move-in Assistant", layout="wide")
+
+# -----------------------
+# GOOGLE SHEETS CONNECTION (SECURE)
+# -----------------------
+@st.cache_data
+def load_pg_data():
+    creds_dict = st.secrets["gcp"]
+
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ],
+    )
+
+    client = gspread.authorize(creds)
+
+    sheet = client.open("pg_data").sheet1
+    data = sheet.get_all_records()
+
+    return pd.DataFrame(data)
+
+df = load_pg_data()
+pg_list = df.to_dict(orient="records")
 
 # -----------------------
 # SESSION STATE
@@ -21,24 +49,22 @@ st.title("🏠 Move-in Assistant")
 st.write("Move in → Get essentials → Explore nearby")
 
 # -----------------------
-# SAMPLE PG DATA (Replace with your sheet later)
+# SELECT PG (FROM SHEET)
 # -----------------------
-pg_list = [
-    {"name": "PG A", "location": "ameerpet"},
-    {"name": "PG B", "location": "madhapur"},
-    {"name": "PG C", "location": "sr nagar"},
-]
+if pg_list:
+    selected_pg = st.selectbox(
+        "🏢 Select Your PG",
+        pg_list,
+        format_func=lambda x: f"{x['name']} ({x['location']})"
+    )
 
-selected_pg = st.selectbox(
-    "🏢 Select Your PG",
-    pg_list,
-    format_func=lambda x: f"{x['name']} ({x['location']})"
-)
-
-selected_location = selected_pg["location"]
+    selected_location = selected_pg["location"].lower()
+else:
+    st.error("No PG data found")
+    st.stop()
 
 # -----------------------
-# NEARBY DATA (Based on location)
+# NEARBY DATA (STATIC FOR NOW)
 # -----------------------
 nearby_data = {
     "ameerpet": [

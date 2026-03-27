@@ -28,39 +28,25 @@ creds = Credentials.from_service_account_info(
 client = gspread.authorize(creds)
 
 # -----------------------
-# LOAD SPREADSHEET
+# OPEN YOUR SHEET (BY KEY)
 # -----------------------
-try:
-    spreadsheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
-except Exception as e:
-    st.error(f"❌ Cannot open sheet: {e}")
-    st.stop()
+spreadsheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
 # -----------------------
 # LOAD PG DATA
 # -----------------------
-try:
-    pg_sheet = spreadsheet.sheet1
-    pg_data = pg_sheet.get_all_records()
-except Exception as e:
-    st.error(f"❌ PG Load Error: {e}")
-    pg_data = []
+pg_sheet = spreadsheet.sheet1
+pg_data = pg_sheet.get_all_records()
 
 # -----------------------
-# LOAD ORDERS SHEET (SAFE)
+# LOAD ORDERS SHEET
 # -----------------------
-try:
-    sheet_names = [ws.title for ws in spreadsheet.worksheets()]
-    # st.write("DEBUG:", sheet_names)  # optional debug
+sheet_names = [ws.title for ws in spreadsheet.worksheets()]
 
-    if "orders" in sheet_names:
-        order_sheet = spreadsheet.worksheet("orders")
-    else:
-        st.error("❌ 'orders' sheet not found. Create it manually.")
-        st.stop()
-
-except Exception as e:
-    st.error(f"❌ Sheet Error: {e}")
+if "orders" in sheet_names:
+    order_sheet = spreadsheet.worksheet("orders")
+else:
+    st.error("❌ 'orders' sheet not found. Create it manually.")
     st.stop()
 
 # -----------------------
@@ -128,7 +114,6 @@ if st.session_state.arrived:
 
         st.divider()
 
-        # CART
         cart = list(st.session_state.selected_categories.values())
 
         if cart:
@@ -164,36 +149,28 @@ if st.session_state.arrived:
             st.info("Cart is empty")
 
     # =====================
-    # 📍 NEARBY
+    # 📍 NEARBY (AUTO)
     # =====================
     with tab2:
 
-        st.subheader(f"Nearby in {selected_location}")
+        st.subheader(f"Nearby in {selected_location.title()}")
 
-        nearby_data = {
-            "ameerpet": ["🍛 Tiffin Center", "🏥 Pharmacy", "🏋️ Gym"],
-            "madhapur": ["🍛 Mess", "🏥 MedPlus", "🏋️ Cult Gym"],
-            "sr nagar": ["🍛 Tiffins", "🏥 Medical", "🏋️ Gym"]
-        }
+        search_items = ["tiffins", "medical shop", "gym", "grocery"]
 
-        places = nearby_data.get(selected_location, [])
+        for item in search_items:
+            query = f"{item} near {selected_location}"
+            maps_url = f"https://www.google.com/maps/search/{query.replace(' ', '+')}"
 
-        if places:
-            for place in places:
-                st.write(place)
-        else:
-            st.info("No nearby data")
+            st.markdown(f"### 🔎 {item.title()}")
+            st.markdown(f"[📍 Open in Google Maps]({maps_url})")
+            st.divider()
 
     # =====================
     # 📜 ORDERS
     # =====================
     with tab3:
 
-        try:
-            orders = order_sheet.get_all_records()
-        except:
-            orders = []
-
+        orders = order_sheet.get_all_records()
         user_orders = [o for o in orders if o["phone"] == user_phone]
 
         if user_orders:

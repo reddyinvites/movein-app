@@ -9,7 +9,9 @@ scope = ["https://spreadsheets.google.com/feeds",
          "https://www.googleapis.com/auth/drive"]
 
 creds = Credentials.from_service_account_info(
-    st.secrets["gcp"], scopes=scope)
+    st.secrets["gcp"],
+    scopes=scope
+)
 
 client = gspread.authorize(creds)
 

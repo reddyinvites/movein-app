@@ -17,6 +17,11 @@ if "selected_categories" not in st.session_state:
 st.title("🏠 Move-in Assistant")
 st.write("Move in → Get essentials → Explore nearby")
 
+pg_data = [
+    {"name": "Sai PG", "location": "Ameerpet"},
+    {"name": "Comfort Stay", "location": "Madhapur"}
+]
+
 # -----------------------
 # SELECT PG (FROM SHEET)
 # -----------------------

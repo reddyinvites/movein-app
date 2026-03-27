@@ -1,3 +1,8 @@
+import streamlit as st   # ✅ MUST BE FIRST
+import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
+
 # -----------------------
 # LOAD GOOGLE SHEET DATA
 # -----------------------

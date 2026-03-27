@@ -2,6 +2,7 @@ import streamlit as st   # ✅ MUST BE FIRST
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+from datetime import datetime
 
 # -----------------------
 # SESSION STATE
@@ -27,13 +28,23 @@ creds = Credentials.from_service_account_info(
 
 client = gspread.authorize(creds)
 
+# -----------------------
 # LOAD PG DATA
+# -----------------------
 try:
-    sheet = client.open("pg_data").sheet1
-    data = sheet.get_all_records()
-    pg_data = data if isinstance(data, list) else []
+    pg_sheet = client.open("pg_data").sheet1
+    pg_data = pg_sheet.get_all_records()
 except:
     pg_data = []
+
+# -----------------------
+# LOAD ORDERS SHEET
+# -----------------------
+try:
+    order_sheet = client.open("pg_data").worksheet("orders")
+except:
+    order_sheet = client.open("pg_data").add_worksheet(title="orders", rows="1000", cols="10")
+    order_sheet.append_row(["name", "phone", "pg", "items", "total", "status", "time"])
 
 # -----------------------
 # HEADER
@@ -42,52 +53,24 @@ st.title("🏠 Move-in Assistant")
 st.write("Move in → Get essentials → Explore nearby")
 
 # -----------------------
+# USER DETAILS
+# -----------------------
+user_name = st.text_input("👤 Your Name")
+user_phone = st.text_input("📞 Phone Number")
+
+# -----------------------
 # SELECT PG
 # -----------------------
 if pg_data:
     selected_pg = st.selectbox(
         "🏢 Select Your PG",
         pg_data,
-        format_func=lambda x: f"{x['name']} - {x['location']} - ₹{x.get('price', 'N/A')}"
+        format_func=lambda x: f"{x['name']} - {x['location']} - ₹{x.get('price','N/A')}"
     )
-
     selected_location = selected_pg["location"].lower()
-
-    # SHOW DETAILS
-    st.markdown("### 📋 PG Details")
-    st.write(f"💰 Price: ₹{selected_pg.get('price', 'N/A')}")
-    st.write(f"🍽 Food: {selected_pg.get('food', 'N/A')}")
-    st.write(f"🛏 Room: {selected_pg.get('room_type', 'N/A')}")
-    st.write(f"⭐ Rating: {selected_pg.get('rating', 'N/A')}")
-    st.write(f"📞 Phone: {selected_pg.get('phone', 'N/A')}")
-
 else:
     st.error("No PG data found")
     st.stop()
-
-# -----------------------
-# NEARBY DATA
-# -----------------------
-nearby_data = {
-    "ameerpet": [
-        {"name": "🍛 Ameerpet Tiffin Center", "info": "⭐ 4.2 • ₹60 meal • Open now"},
-        {"name": "🏥 Apollo Pharmacy", "info": "24/7 Medical Shop"},
-        {"name": "🏋️ Fitness Gym", "info": "Budget friendly"},
-        {"name": "🛒 Local Grocery", "info": "Daily needs"}
-    ],
-    "madhapur": [
-        {"name": "🍛 Madhapur Mess", "info": "⭐ 4.5 • ₹80 meal • Open now"},
-        {"name": "🏥 MedPlus Pharmacy", "info": "24/7 open"},
-        {"name": "🏋️ Cult Gym", "info": "Premium"},
-        {"name": "🛒 Reliance Smart", "info": "Groceries"}
-    ],
-    "sr nagar": [
-        {"name": "🍛 SR Nagar Tiffins", "info": "⭐ 4.1 • ₹50 meal"},
-        {"name": "🏥 Local Pharmacy", "info": "Open now"},
-        {"name": "🏋️ Power Gym", "info": "Affordable"},
-        {"name": "🛒 Super Market", "info": "Daily essentials"}
-    ]
-}
 
 # -----------------------
 # ARRIVAL BUTTON
@@ -102,29 +85,24 @@ if not st.session_state.arrived:
 # -----------------------
 if st.session_state.arrived:
 
-    tab1, tab2 = st.tabs(["🛍️ Essentials", "📍 Nearby Guide"])
+    tab1, tab2, tab3 = st.tabs(["🛍️ Essentials", "📍 Nearby", "📜 Orders"])
 
     # =====================
     # 🛍️ ESSENTIALS
     # =====================
     with tab1:
-        st.subheader("Starter Kits")
 
         kits = [
-            {"name": "🛏️ Basic Kit", "price": 249, "items": "Bedsheet + Pillow", "category": "basic"},
-            {"name": "🪣 Utility Kit", "price": 199, "items": "Bucket + Mug", "category": "utility"},
-            {"name": "🧼 Hygiene Kit", "price": 129, "items": "Soap + Toothpaste + Detergent", "category": "hygiene"},
-            {"name": "🎁 Combo Kit ⭐ (Best Value)", "price": 449, "items": "All items included", "category": "combo"}
+            {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow", "category": "basic"},
+            {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug", "category": "utility"},
+            {"name": "Hygiene Kit", "price": 129, "items": "Soap + Toothpaste", "category": "hygiene"},
+            {"name": "Combo Kit", "price": 449, "items": "All items", "category": "combo"}
         ]
 
         for kit in kits:
-            col1, col2 = st.columns([3, 1])
-
+            col1, col2 = st.columns([3,1])
             with col1:
-                st.markdown(f"### {kit['name']}")
-                st.write(kit["items"])
-                st.write(f"💰 ₹{kit['price']}")
-
+                st.write(f"{kit['name']} - ₹{kit['price']}")
             with col2:
                 if st.button("Add", key=kit["name"]):
                     st.session_state.selected_categories[kit["category"]] = kit
@@ -132,48 +110,73 @@ if st.session_state.arrived:
         st.divider()
 
         # CART
-        st.subheader("🛒 Your Cart")
+        cart = list(st.session_state.selected_categories.values())
 
-        cart_items = list(st.session_state.selected_categories.values())
+        if cart:
+            total = sum(item["price"] for item in cart)
 
-        if cart_items:
-            total = 0
-
-            for i, item in enumerate(cart_items):
-                col1, col2 = st.columns([3, 1])
-
-                with col1:
-                    st.write(f"{item['name']} - ₹{item['price']}")
-
-                with col2:
-                    if st.button("❌", key=f"remove_{i}"):
-                        del st.session_state.selected_categories[item["category"]]
-                        st.rerun()
-
-                total += item["price"]
+            for item in cart:
+                st.write(f"{item['name']} - ₹{item['price']}")
 
             st.write(f"### Total: ₹{total}")
 
             if st.button("✅ Place Order"):
-                st.success("🎉 Order placed! Delivery on the way.")
-                st.session_state.selected_categories = {}
+                if user_name and user_phone:
+
+                    items_text = ", ".join([i["name"] for i in cart])
+
+                    order_sheet.append_row([
+                        user_name,
+                        user_phone,
+                        selected_pg["name"],
+                        items_text,
+                        total,
+                        "Active",
+                        str(datetime.now())
+                    ])
+
+                    st.success("🎉 Order placed!")
+                    st.session_state.selected_categories = {}
+
+                else:
+                    st.warning("Enter name & phone")
 
         else:
-            st.info("Cart is empty")
+            st.info("Cart empty")
 
     # =====================
-    # 📍 NEARBY GUIDE
+    # 📍 NEARBY
     # =====================
     with tab2:
-        st.subheader(f"Nearby in {selected_location.title()}")
+        st.write(f"Nearby in {selected_location}")
 
-        places = nearby_data.get(selected_location, [])
+    # =====================
+    # 📜 ORDERS
+    # =====================
+    with tab3:
 
-        if places:
-            for place in places:
-                st.markdown(f"### {place['name']}")
-                st.write(place["info"])
-                st.markdown("[🗺️ Open in Google Maps](https://www.google.com/maps)")
+        try:
+            orders = order_sheet.get_all_records()
+        except:
+            orders = []
+
+        user_orders = [o for o in orders if o["phone"] == user_phone]
+
+        if user_orders:
+            for i, order in enumerate(user_orders):
+
+                st.write(f"🧾 {order['items']} - ₹{order['total']}")
+                st.write(f"📍 {order['pg']}")
+                st.write(f"📌 Status: {order['status']}")
+
+                if order["status"] == "Active":
+                    if st.button("❌ Cancel", key=f"cancel_{i}"):
+                        row_index = i + 2
+                        order_sheet.update_cell(row_index, 6, "Cancelled")
+                        st.success("Cancelled")
+                        st.rerun()
+
                 st.divider()
+
         else:
-            st.info("No nearby data available")
+            st.info("No orders found")

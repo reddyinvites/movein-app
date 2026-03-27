@@ -12,6 +12,9 @@ if "arrived" not in st.session_state:
 if "selected_categories" not in st.session_state:
     st.session_state.selected_categories = {}
 
+if "payment_done" not in st.session_state:
+    st.session_state.payment_done = False
+
 # -----------------------
 # GOOGLE SHEETS CONNECT
 # -----------------------
@@ -28,26 +31,15 @@ creds = Credentials.from_service_account_info(
 client = gspread.authorize(creds)
 
 # -----------------------
-# OPEN SHEET (BY KEY)
+# OPEN SHEET
 # -----------------------
 spreadsheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
-# -----------------------
-# LOAD PG DATA
-# -----------------------
 pg_sheet = spreadsheet.sheet1
 pg_data = pg_sheet.get_all_records()
 
-# -----------------------
-# LOAD ORDERS SHEET
-# -----------------------
 sheet_names = [ws.title for ws in spreadsheet.worksheets()]
-
-if "orders" in sheet_names:
-    order_sheet = spreadsheet.worksheet("orders")
-else:
-    st.error("❌ 'orders' sheet not found")
-    st.stop()
+order_sheet = spreadsheet.worksheet("orders")
 
 # -----------------------
 # HEADER
@@ -64,16 +56,13 @@ user_phone = st.text_input("📞 Phone Number")
 # -----------------------
 # SELECT PG
 # -----------------------
-if pg_data:
-    selected_pg = st.selectbox(
-        "🏢 Select Your PG",
-        pg_data,
-        format_func=lambda x: f"{x['name']} - {x['location']} - ₹{x.get('price','N/A')}"
-    )
-    selected_location = selected_pg["location"].lower()
-else:
-    st.error("No PG data found")
-    st.stop()
+selected_pg = st.selectbox(
+    "🏢 Select Your PG",
+    pg_data,
+    format_func=lambda x: f"{x['name']} - {x['location']} - ₹{x.get('price','N/A')}"
+)
+
+selected_location = selected_pg["location"].lower()
 
 # -----------------------
 # ARRIVAL BUTTON
@@ -140,33 +129,62 @@ if st.session_state.arrived:
                         str(datetime.now())
                     ])
 
-                    # UPI PAYMENT
-                    upi_id = "reddyinvites@okicici"
-                    name = "MoveIn Services"
+                    st.session_state.current_order = {
+                        "items": items_text,
+                        "total": total
+                    }
 
-                    upi_link = f"upi://pay?pa={upi_id}&pn={name}&am={total}&cu=INR"
+                    st.session_state.payment_done = False
 
-                    st.success("🧾 Order placed! Pay now 👇")
+        # -----------------------
+        # PAYMENT SECTION
+        # -----------------------
+        if "current_order" in st.session_state:
 
-                    st.markdown(f"[💰 Pay via UPI]({upi_link})")
-                    st.warning("⚠️ After payment, click WhatsApp to confirm")
+            total = st.session_state.current_order["total"]
+            items_text = st.session_state.current_order["items"]
 
-                    # WHATSAPP
-                    message = f"Hello {user_name}, Your order is placed. PG: {selected_pg['name']}, Items: {items_text}, Total: ₹{total}. Pay here: {upi_link}"
-                    whatsapp_url = f"https://wa.me/{user_phone}?text={message.replace(' ', '%20')}"
+            upi_id = "reddyinvites@okicici"
+            name = "MoveIn Services"
 
-                    st.markdown(f"[📲 Confirm on WhatsApp]({whatsapp_url})")
+            upi_link = f"upi://pay?pa={upi_id}&pn={name}&am={total}&cu=INR"
 
-                    st.session_state.selected_categories = {}
+            st.success("🧾 Order placed!")
 
-                else:
-                    st.warning("⚠️ Enter name & phone")
+            # PAY BUTTON
+            st.markdown(
+                f"""
+                <a href="{upi_link}">
+                    <button style="
+                        background-color:#28a745;
+                        color:white;
+                        padding:12px 20px;
+                        border:none;
+                        border-radius:8px;
+                        font-size:16px;">
+                        💰 Pay Now
+                    </button>
+                </a>
+                """,
+                unsafe_allow_html=True
+            )
 
-        else:
-            st.info("Cart is empty")
+            # I PAID BUTTON
+            if st.button("✅ I Paid"):
+                st.session_state.payment_done = True
+                st.success("Payment marked as done!")
+
+            # WHATSAPP AFTER PAYMENT
+            if st.session_state.payment_done:
+
+                message = f"Hello {user_name}, I have completed payment. PG: {selected_pg['name']}, Items: {items_text}, Total: ₹{total}"
+
+                whatsapp_url = f"https://wa.me/{user_phone}?text={message.replace(' ', '%20')}"
+
+                st.markdown(f"[📲 Confirm on WhatsApp]({whatsapp_url})")
 
     # =====================
-    # 📍 NEARBY (AUTO)
+    # 📍 NEARBY
     # =====================
     with tab2:
 
@@ -179,7 +197,7 @@ if st.session_state.arrived:
             maps_url = f"https://www.google.com/maps/search/{query.replace(' ', '+')}"
 
             st.markdown(f"### 🔎 {item.title()}")
-            st.markdown(f"[📍 Open in Google Maps]({maps_url})")
+            st.markdown(f"[📍 Open in Maps]({maps_url})")
             st.divider()
 
     # =====================
@@ -203,7 +221,7 @@ if st.session_state.arrived:
                         row_index = i + 2
                         order_sheet.update_cell(row_index, 6, "Cancelled")
 
-                        st.success("Cancelled successfully")
+                        st.success("Cancelled")
                         st.rerun()
 
                 st.divider()

@@ -1,29 +1,15 @@
-import streamlit as st   # ✅ MUST BE FIRST
+import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
 # -----------------------
-# SESSION STATE
+# APP MODE SWITCH
 # -----------------------
-if "arrived" not in st.session_state:
-    st.session_state.arrived = False
-
-if "selected_categories" not in st.session_state:
-    st.session_state.selected_categories = {}
-
-if "payment_done" not in st.session_state:
-    st.session_state.payment_done = False
+mode = st.sidebar.selectbox("Select Mode", ["User App", "Admin Dashboard"])
 
 # -----------------------
-# ADMIN LOGIN
-# -----------------------
-st.sidebar.title("🔐 Admin Panel")
-admin_password = st.sidebar.text_input("Enter Password", type="password")
-is_admin = admin_password == "1234"   # 🔥 change this
-
-# -----------------------
-# GOOGLE SHEETS CONNECT
+# GOOGLE SHEETS
 # -----------------------
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -36,197 +22,113 @@ creds = Credentials.from_service_account_info(
 )
 
 client = gspread.authorize(creds)
+sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
-spreadsheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
+pg_sheet = sheet.sheet1
+order_sheet = sheet.worksheet("orders")
 
-pg_sheet = spreadsheet.sheet1
 pg_data = pg_sheet.get_all_records()
 
-order_sheet = spreadsheet.worksheet("orders")
+# =====================
+# 👤 USER APP
+# =====================
+if mode == "User App":
 
-# -----------------------
-# HEADER
-# -----------------------
-st.title("🏠 Move-in Assistant")
-st.write("Move in → Get essentials → Explore nearby")
+    st.title("🏠 Move-in Assistant")
 
-# -----------------------
-# USER INPUT
-# -----------------------
-user_name = st.text_input("👤 Your Name")
-user_phone = st.text_input("📞 Phone Number")
+    name = st.text_input("👤 Name")
+    phone = st.text_input("📞 Phone")
 
-# -----------------------
-# PREVENT MULTIPLE ORDERS
-# -----------------------
-orders = order_sheet.get_all_records()
-existing_orders = [o for o in orders if o["phone"] == user_phone and o["status"] != "Cancelled"]
+    selected_pg = st.selectbox(
+        "🏢 Select PG",
+        pg_data,
+        format_func=lambda x: f"{x['name']} - {x['location']}"
+    )
 
-if existing_orders and not is_admin:
-    st.warning("⚠️ You already placed an order. Wait for confirmation.")
-    st.stop()
-
-# -----------------------
-# SELECT PG
-# -----------------------
-selected_pg = st.selectbox(
-    "🏢 Select Your PG",
-    pg_data,
-    format_func=lambda x: f"{x['name']} - {x['location']} - ₹{x.get('price','N/A')}"
-)
-
-selected_location = selected_pg["location"].lower()
-
-# -----------------------
-# ARRIVAL BUTTON
-# -----------------------
-if not st.session_state.arrived:
     if st.button("📍 I reached PG"):
-        st.session_state.arrived = True
-        st.success("Welcome! Let's get you settled 👇")
+        st.success("Welcome!")
 
-# -----------------------
-# USER APP
-# -----------------------
-if st.session_state.arrived and not is_admin:
+    kits = [
+        {"name": "Basic Kit", "price": 249},
+        {"name": "Utility Kit", "price": 199},
+        {"name": "Hygiene Kit", "price": 129}
+    ]
 
-    tab1, tab2 = st.tabs(["🛍️ Essentials", "📍 Nearby"])
+    cart = []
 
-    # =====================
-    # ESSENTIALS
-    # =====================
-    with tab1:
+    for kit in kits:
+        if st.button(f"Add {kit['name']}"):
+            cart.append(kit)
 
-        kits = [
-            {"name": "🛏️ Basic Kit", "price": 249, "category": "basic"},
-            {"name": "🪣 Utility Kit", "price": 199, "category": "utility"},
-            {"name": "🧼 Hygiene Kit", "price": 129, "category": "hygiene"},
-            {"name": "🎁 Combo Kit", "price": 449, "category": "combo"}
-        ]
+    if cart:
+        total = sum(k["price"] for k in cart)
+        st.write(f"Total: ₹{total}")
 
-        for kit in kits:
-            col1, col2 = st.columns([3,1])
-            with col1:
-                st.write(f"{kit['name']} - ₹{kit['price']}")
-            with col2:
-                if st.button("Add", key=kit["name"]):
-                    st.session_state.selected_categories[kit["category"]] = kit
+        if st.button("Place Order"):
 
-        st.divider()
+            items = ", ".join([k["name"] for k in cart])
 
-        cart = list(st.session_state.selected_categories.values())
+            order_sheet.append_row([
+                name,
+                phone,
+                selected_pg["name"],
+                items,
+                total,
+                "Pending",
+                str(datetime.now())
+            ])
 
-        if cart:
-            total = sum(item["price"] for item in cart)
+            upi = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
 
-            for item in cart:
-                st.write(f"{item['name']} - ₹{item['price']}")
+            st.markdown(f"[💰 Pay Now]({upi})")
 
-            st.write(f"### Total: ₹{total}")
-
-            if st.button("✅ Place Order"):
-                if user_name and user_phone:
-
-                    items_text = ", ".join([i["name"] for i in cart])
-
-                    order_sheet.append_row([
-                        user_name,
-                        user_phone,
-                        selected_pg["name"],
-                        items_text,
-                        total,
-                        "Pending",
-                        str(datetime.now())
-                    ])
-
-                    st.session_state.current_order = {
-                        "items": items_text,
-                        "total": total
-                    }
-
-                    st.session_state.payment_done = False
-
-        # PAYMENT FLOW
-        if "current_order" in st.session_state:
-
-            total = st.session_state.current_order["total"]
-            items_text = st.session_state.current_order["items"]
-
-            upi_link = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}&cu=INR"
-
-            st.success("🧾 Order placed!")
-
-            st.markdown(
-                f"""
-                <a href="{upi_link}">
-                    <button style="background-color:#28a745;color:white;padding:12px;border-radius:8px;">
-                    💰 Pay Now
-                    </button>
-                </a>
-                """,
-                unsafe_allow_html=True
-            )
-
-            st.warning("⚠️ After payment, upload screenshot")
-
-            file = st.file_uploader("📸 Upload Screenshot", type=["png","jpg","jpeg"])
+            file = st.file_uploader("📸 Upload Screenshot")
 
             if file:
-                st.image(file)
-                st.success("✅ Uploaded! We will verify your payment.")
-                st.info("⏳ Please wait... we will confirm via WhatsApp shortly")
+                st.success("✅ Payment screenshot uploaded!")
+                
+                st.info("""
+⏳ We will verify your payment.
 
-                st.session_state.payment_done = True
-                st.session_state.selected_categories = {}
-
-            if st.session_state.payment_done:
-                msg = f"Hello {user_name}, I have paid ₹{total} for {items_text}"
-                wa = f"https://wa.me/{user_phone}?text={msg.replace(' ','%20')}"
-
-                if st.button("📲 Confirm on WhatsApp"):
-                    st.markdown(f"<meta http-equiv='refresh' content='0; url={wa}'>", unsafe_allow_html=True)
-
-    # =====================
-    # NEARBY
-    # =====================
-    with tab2:
-        st.subheader(f"Nearby in {selected_location.title()}")
-
-        for item in ["tiffins","medical","gym","grocery"]:
-            url = f"https://www.google.com/maps/search/{item}+near+{selected_location}"
-            st.markdown(f"🔎 [{item.title()}]({url})")
+Please stay here...
+We will confirm shortly.
+""")
 
 # =====================
-# ADMIN DASHBOARD
+# 👨‍💼 ADMIN DASHBOARD
 # =====================
-if is_admin:
+elif mode == "Admin Dashboard":
 
     st.title("👨‍💼 Admin Dashboard")
+
+    password = st.text_input("Enter Password", type="password")
+
+    if password != "1234":
+        st.warning("Enter correct password")
+        st.stop()
 
     orders = order_sheet.get_all_records()
 
     for i, o in enumerate(orders):
 
-        st.write(f"👤 {o['name']} | 📞 {o['phone']}")
-        st.write(f"🏢 {o['pg']}")
+        st.write(f"👤 {o['name']}")
+        st.write(f"📞 {o['phone']}")
         st.write(f"🛒 {o['items']}")
         st.write(f"💰 ₹{o['total']}")
         st.write(f"📌 {o['status']}")
 
         col1, col2 = st.columns(2)
 
-        if col1.button("✅ Approve", key=f"a{i}"):
-            order_sheet.update_cell(i+2,6,"Approved")
-            st.success("Approved")
+        if col1.button("Approve", key=f"a{i}"):
+            order_sheet.update_cell(i+2, 6, "Approved")
 
-        if col2.button("❌ Reject", key=f"r{i}"):
-            order_sheet.update_cell(i+2,6,"Rejected")
-            st.error("Rejected")
+        if col2.button("Reject", key=f"r{i}"):
+            order_sheet.update_cell(i+2, 6, "Rejected")
 
+        # WhatsApp only in admin
         msg = f"Hello {o['name']}, your order is {o['status']}"
         wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
 
-        if st.button("📲 WhatsApp User", key=f"w{i}"):
-            st.markdown(f"<meta http-equiv='refresh' content='0; url={wa}'>", unsafe_allow_html=True)
+        st.markdown(f"[📲 Message User]({wa})")
 
         st.divider()

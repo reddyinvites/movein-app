@@ -2,10 +2,9 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-import base64
 
 # -----------------------
-# SESSION INIT
+# SESSION
 # -----------------------
 if "page" not in st.session_state:
     st.session_state.page = "home"
@@ -14,7 +13,7 @@ if "cart" not in st.session_state:
     st.session_state.cart = {}
 
 # -----------------------
-# GOOGLE SHEETS SETUP
+# GOOGLE SHEETS
 # -----------------------
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -35,7 +34,7 @@ order_sheet = sheet.worksheet("orders")
 pg_data = pg_sheet.get_all_records()
 
 # =====================
-# 🏠 HOME
+# HOME
 # =====================
 if st.session_state.page == "home":
 
@@ -52,14 +51,14 @@ if st.session_state.page == "home":
         st.rerun()
 
 # =====================
-# 👤 USER DASHBOARD
+# USER
 # =====================
 elif st.session_state.page == "user":
 
     st.title("👤 User Dashboard")
 
-    name = st.text_input("Name", placeholder="Enter your name")
-    phone = st.text_input("Phone", placeholder="+91XXXXXXXXXX")
+    name = st.text_input("Name")
+    phone = st.text_input("Phone")
 
     selected_pg = st.selectbox(
         "Select PG",
@@ -78,45 +77,37 @@ elif st.session_state.page == "user":
         cart = st.session_state.cart
 
         products = {
-            "basic": {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow"},
-            "utility": {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug"},
-            "hygiene": {"name": "Hygiene Kit", "price": 129, "items": "Soap + Toothpaste"},
-            "combo": {"name": "Combo Kit", "price": 499, "items": "All items included"}
+            "basic": {"name": "Basic Kit", "price": 249},
+            "utility": {"name": "Utility Kit", "price": 199},
+            "hygiene": {"name": "Hygiene Kit", "price": 129},
+            "combo": {"name": "Combo Kit", "price": 499}
         }
 
         combo_selected = "combo" in cart
         others_selected = any(k in cart for k in ["basic","utility","hygiene"])
 
-        # -----------------------
         # NORMAL ITEMS
-        # -----------------------
         for key in ["basic","utility","hygiene"]:
             p = products[key]
 
-            st.markdown(f"### {p['name']}")
-            st.write(p["items"])
-            st.write(f"₹{p['price']}")
+            st.write(f"{p['name']} - ₹{p['price']}")
 
             if combo_selected:
-                st.button(f"Add {p['name']}", disabled=True, key=f"d_{key}")
+                st.button("Add", disabled=True, key=f"d{key}")
             else:
                 if key in cart:
-                    if st.button(f"❌ Remove {p['name']}", key=f"r_{key}"):
+                    if st.button("❌ Remove", key=f"r{key}"):
                         del cart[key]
                         st.rerun()
                 else:
-                    if st.button(f"Add {p['name']}", key=f"a_{key}"):
+                    if st.button("Add", key=f"a{key}"):
                         cart[key] = p
                         st.rerun()
 
-        # -----------------------
         # COMBO
-        # -----------------------
         p = products["combo"]
 
-        st.markdown(f"### 🎁 {p['name']}")
-        st.write(p["items"])
-        st.write(f"₹{p['price']}")
+        st.write(f"🎁 Combo Kit - ₹{p['price']}")
 
         if "combo" in cart:
             if st.button("❌ Remove Combo"):
@@ -133,15 +124,13 @@ elif st.session_state.page == "user":
 
         st.divider()
 
-        # -----------------------
         # CART
-        # -----------------------
         if cart:
             total = sum(i["price"] for i in cart.values())
 
-            st.subheader("🛒 Selected Items")
+            st.write("🛒 Selected:")
             for i in cart.values():
-                st.write(f"{i['name']} - ₹{i['price']}")
+                st.write(i["name"])
 
             st.write(f"### Total: ₹{total}")
 
@@ -156,18 +145,14 @@ elif st.session_state.page == "user":
                     items,
                     total,
                     "Pending",
-                    str(datetime.now()),
-                    ""   # screenshot placeholder
+                    str(datetime.now())
                 ])
 
-                st.session_state.last_row = len(order_sheet.get_all_values())
                 st.session_state.order_done = True
                 st.session_state.total = total
                 st.rerun()
 
-        # -----------------------
         # PAYMENT
-        # -----------------------
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
@@ -179,23 +164,17 @@ elif st.session_state.page == "user":
             file = st.file_uploader("Upload Payment Screenshot")
 
             if file:
-                image_bytes = file.read()
-                encoded = base64.b64encode(image_bytes).decode()
-
-                row = st.session_state.last_row
-                order_sheet.update_cell(row, 8, encoded)
-
                 st.image(file)
                 st.success("Uploaded!")
+
                 st.info("⏳ We will confirm on WhatsApp shortly...")
 
-                # RESET
                 st.session_state.clear()
                 st.session_state.page = "home"
                 st.rerun()
 
 # =====================
-# 👨‍💼 ADMIN DASHBOARD
+# ADMIN
 # =====================
 elif st.session_state.page == "admin":
 
@@ -212,10 +191,9 @@ elif st.session_state.page == "admin":
 
         row = i + 2
 
-        st.write(f"👤 {o['name']} | 📞 {o['phone']}")
-        st.write(f"🛒 {o['items']} | ₹{o['total']}")
+        st.write(f"{o['name']} | {o['phone']}")
+        st.write(f"{o['items']} | ₹{o['total']}")
 
-        # STATUS
         if o["status"] == "Pending":
             st.warning("Pending")
         elif o["status"] == "Paid":
@@ -223,40 +201,27 @@ elif st.session_state.page == "admin":
         elif o["status"] == "Cancelled":
             st.error("Cancelled")
 
-        # -----------------------
-        # SHOW SCREENSHOT
-        # -----------------------
-        if o.get("screenshot"):
-            try:
-                img = base64.b64decode(o["screenshot"])
-                st.image(img, caption="Payment Screenshot")
-            except:
-                st.info("Image error")
-
         col1, col2 = st.columns(2)
 
         # APPROVE
-        if col1.button("✅ Approve", key=f"a{i}"):
+        if col1.button("Approve", key=f"a{i}"):
 
             order_sheet.update_cell(row, 6, "Paid")
 
             msg = f"Hello {o['name']}, your payment is confirmed!"
-            wa_url = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
-
-            st.success("Marked Paid")
+            wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
 
             st.markdown(f"""
                 <script>
-                    window.open("{wa_url}", "_blank");
+                    window.open("{wa}", "_blank");
                 </script>
             """, unsafe_allow_html=True)
 
             st.rerun()
 
         # CANCEL
-        if col2.button("❌ Cancel", key=f"c{i}"):
+        if col2.button("Cancel", key=f"c{i}"):
             order_sheet.update_cell(row, 6, "Cancelled")
-            st.error("Order Cancelled")
             st.rerun()
 
         st.divider()

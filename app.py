@@ -4,10 +4,13 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 
 # -----------------------
-# SESSION
+# SESSION INIT
 # -----------------------
 if "page" not in st.session_state:
     st.session_state.page = "home"
+
+if "cart" not in st.session_state:
+    st.session_state.cart = {}
 
 # -----------------------
 # GOOGLE SHEETS
@@ -31,7 +34,7 @@ order_sheet = sheet.worksheet("orders")
 pg_data = pg_sheet.get_all_records()
 
 # =====================
-# 🏠 HOME PAGE
+# 🏠 HOME
 # =====================
 if st.session_state.page == "home":
 
@@ -48,25 +51,21 @@ if st.session_state.page == "home":
         st.rerun()
 
 # =====================
-# 👤 USER PAGE
+# 👤 USER
 # =====================
 elif st.session_state.page == "user":
 
     st.title("👤 User Dashboard")
 
-    # DEFAULT VALUES
-    name = st.text_input("Name", value="Guest")
-    phone = st.text_input("Phone", value="+919618557269")
+    # WATERMARK INPUTS
+    name = st.text_input("Name", placeholder="Enter your name")
+    phone = st.text_input("Phone", placeholder="+91XXXXXXXXXX")
 
     selected_pg = st.selectbox(
         "Select PG",
         pg_data,
         format_func=lambda x: f"{x['name']} - {x['location']}"
     )
-
-    # SESSION
-    if "cart" not in st.session_state:
-        st.session_state.cart = {}
 
     if "arrived" not in st.session_state:
         st.session_state.arrived = False
@@ -80,47 +79,79 @@ elif st.session_state.page == "user":
 
         cart = st.session_state.cart
 
-        basic = {"name": "Basic Kit", "price": 249}
-        utility = {"name": "Utility Kit", "price": 199}
-        hygiene = {"name": "Hygiene Kit", "price": 129}
-        combo = {"name": "Combo Kit", "price": 449}
+        # PRODUCTS
+        basic = {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow"}
+        utility = {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug"}
+        hygiene = {"name": "Hygiene Kit", "price": 129, "items": "Soap + Toothpaste + Detergent"}
+        combo = {"name": "Combo Kit", "price": 449, "items": "All items included"}
 
+        # LOGIC
         combo_selected = "combo" in cart
-        others_selected = any(k in cart for k in ["basic","utility","hygiene"])
+        others_selected = ("basic" in cart or "utility" in cart or "hygiene" in cart)
+
+        # FIX MIXING
+        if combo_selected:
+            cart.pop("basic", None)
+            cart.pop("utility", None)
+            cart.pop("hygiene", None)
+
+        if others_selected:
+            cart.pop("combo", None)
 
         col1, col2 = st.columns(2)
 
+        # LEFT SIDE
         with col1:
-            if st.button("Basic Kit", disabled=combo_selected):
+
+            st.markdown("### 🛏️ Basic Kit")
+            st.write("Bedsheet + Pillow")
+            st.write("₹249")
+            if st.button("Add Basic", disabled=combo_selected):
                 cart["basic"] = basic
 
-            if st.button("Utility Kit", disabled=combo_selected):
+            st.markdown("### 🪣 Utility Kit")
+            st.write("Bucket + Mug")
+            st.write("₹199")
+            if st.button("Add Utility", disabled=combo_selected):
                 cart["utility"] = utility
 
-            if st.button("Hygiene Kit", disabled=combo_selected):
+            st.markdown("### 🧼 Hygiene Kit")
+            st.write("Soap + Toothpaste + Detergent")
+            st.write("₹129")
+            if st.button("Add Hygiene", disabled=combo_selected):
                 cart["hygiene"] = hygiene
 
+        # RIGHT SIDE
         with col2:
-            if st.button("Combo Kit", disabled=others_selected):
+
+            st.markdown("### 🎁 Combo Kit")
+            st.write("All items included")
+            st.write("₹449")
+            if st.button("Add Combo", disabled=others_selected):
                 cart.clear()
                 cart["combo"] = combo
 
         st.divider()
 
+        # CART
         if cart:
-            total = sum(i["price"] for i in cart.values())
+            total = sum(item["price"] for item in cart.values())
 
-            st.write(f"Total: ₹{total}")
+            st.subheader("🛒 Selected Items")
+            for item in cart.values():
+                st.write(f"{item['name']} - ₹{item['price']}")
 
-            if st.button("Place Order"):
+            st.write(f"### Total: ₹{total}")
 
-                items = ", ".join([i["name"] for i in cart.values()])
+            if st.button("✅ Place Order"):
+
+                items_text = ", ".join([i["name"] for i in cart.values()])
 
                 order_sheet.append_row([
                     name,
                     phone,
                     selected_pg["name"],
-                    items,
+                    items_text,
                     total,
                     "Pending",
                     str(datetime.now())
@@ -129,75 +160,74 @@ elif st.session_state.page == "user":
                 st.session_state.order_done = True
                 st.session_state.total = total
 
-    # PAYMENT
-    if st.session_state.get("order_done"):
+        # PAYMENT
+        if st.session_state.get("order_done"):
 
-        total = st.session_state.total
+            total = st.session_state.total
+            upi = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
 
-        upi = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
+            st.success("🧾 Order placed!")
 
-        st.success("Order placed!")
+            st.markdown(f"[💰 Pay Now]({upi})")
 
-        st.markdown(f"[💰 Pay Now]({upi})")
+            st.warning("⚠️ After payment, upload screenshot")
 
-        file = st.file_uploader("Upload Screenshot")
+            file = st.file_uploader("📸 Upload Screenshot", type=["png","jpg","jpeg"])
 
-        if file:
-            st.success("✅ Uploaded!")
+            if file:
+                st.image(file)
+                st.success("✅ Uploaded!")
 
-            st.info("""
-⏳ Payment received.
+                st.info("""
+⏳ We will verify your payment.
 
 We will confirm on WhatsApp shortly.
-Please wait...
 """)
 
-            # RESET EVERYTHING (AUTO LOGOUT)
-            st.session_state.clear()
-            st.session_state.page = "home"
-            st.rerun()
+                # RESET + LOGOUT
+                st.session_state.clear()
+                st.session_state.page = "home"
+                st.rerun()
 
-    # LOGOUT BUTTON
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.session_state.page = "home"
         st.rerun()
 
 # =====================
-# 👨‍💼 ADMIN PAGE
+# 👨‍💼 ADMIN
 # =====================
 elif st.session_state.page == "admin":
 
-    st.title("👨‍💼 Admin Login")
+    st.title("👨‍💼 Admin Dashboard")
 
     password = st.text_input("Password", type="password")
 
-    if password == "1234":
-
-        st.success("Login Success")
-
-        orders = order_sheet.get_all_records()
-
-        for i, o in enumerate(orders):
-
-            st.write(f"{o['name']} | {o['phone']}")
-            st.write(f"{o['items']} | ₹{o['total']}")
-
-            if o["status"] == "Pending":
-                st.warning("Pending")
-            elif o["status"] == "Paid":
-                st.success("Paid")
-
-            if st.button("Approve", key=f"a{i}"):
-                order_sheet.update_cell(i+2, 6, "Paid")
-                st.success("Marked Paid")
-
-            st.divider()
-
-    else:
+    if password != "1234":
         st.warning("Enter correct password")
+        st.stop()
 
-    # LOGOUT
+    orders = order_sheet.get_all_records()
+
+    for i, o in enumerate(orders):
+
+        st.write(f"👤 {o['name']} | 📞 {o['phone']}")
+        st.write(f"🛒 {o['items']}")
+        st.write(f"💰 ₹{o['total']}")
+
+        status = o["status"]
+
+        if status == "Pending":
+            st.warning("Pending")
+        elif status == "Paid":
+            st.success("Paid")
+
+        if st.button("✅ Approve Payment", key=f"a{i}"):
+            order_sheet.update_cell(i+2, 6, "Paid")
+            st.success("Updated to PAID")
+
+        st.divider()
+
     if st.button("🚪 Logout"):
         st.session_state.clear()
         st.session_state.page = "home"

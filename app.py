@@ -21,6 +21,47 @@ st.title("🏠 Move-in Assistant")
 st.write("Move in → Get essentials → Explore nearby")
 
 # -----------------------
+# SAMPLE PG DATA (Replace with your sheet later)
+# -----------------------
+pg_list = [
+    {"name": "PG A", "location": "ameerpet"},
+    {"name": "PG B", "location": "madhapur"},
+    {"name": "PG C", "location": "sr nagar"},
+]
+
+selected_pg = st.selectbox(
+    "🏢 Select Your PG",
+    pg_list,
+    format_func=lambda x: f"{x['name']} ({x['location']})"
+)
+
+selected_location = selected_pg["location"]
+
+# -----------------------
+# NEARBY DATA (Based on location)
+# -----------------------
+nearby_data = {
+    "ameerpet": [
+        {"name": "🍛 Ameerpet Tiffin Center", "info": "⭐ 4.2 • ₹60 meal • Open now"},
+        {"name": "🏥 Apollo Pharmacy", "info": "24/7 Medical Shop"},
+        {"name": "🏋️ Fitness Gym", "info": "Budget friendly"},
+        {"name": "🛒 Local Grocery", "info": "Daily needs"}
+    ],
+    "madhapur": [
+        {"name": "🍛 Madhapur Mess", "info": "⭐ 4.5 • ₹80 meal • Open now"},
+        {"name": "🏥 MedPlus Pharmacy", "info": "24/7 open"},
+        {"name": "🏋️ Cult Gym", "info": "Premium"},
+        {"name": "🛒 Reliance Smart", "info": "Groceries"}
+    ],
+    "sr nagar": [
+        {"name": "🍛 SR Nagar Tiffins", "info": "⭐ 4.1 • ₹50 meal"},
+        {"name": "🏥 Local Pharmacy", "info": "Open now"},
+        {"name": "🏋️ Power Gym", "info": "Affordable"},
+        {"name": "🛒 Super Market", "info": "Daily essentials"}
+    ]
+}
+
+# -----------------------
 # ARRIVAL BUTTON
 # -----------------------
 if not st.session_state.arrived:
@@ -36,7 +77,7 @@ if st.session_state.arrived:
     tab1, tab2 = st.tabs(["🛍️ Essentials", "📍 Nearby Guide"])
 
     # =====================
-    # 🛍️ ESSENTIALS TAB
+    # 🛍️ ESSENTIALS
     # =====================
     with tab1:
         st.subheader("Starter Kits")
@@ -58,14 +99,11 @@ if st.session_state.arrived:
 
             with col2:
                 if st.button("Add", key=kit["name"]):
-                    # Only one per category
                     st.session_state.selected_categories[kit["category"]] = kit
 
         st.divider()
 
-        # -----------------------
         # CART
-        # -----------------------
         st.subheader("🛒 Your Cart")
 
         cart_items = list(st.session_state.selected_categories.values())
@@ -96,20 +134,18 @@ if st.session_state.arrived:
             st.info("Cart is empty")
 
     # =====================
-    # 📍 NEARBY GUIDE TAB
+    # 📍 NEARBY GUIDE
     # =====================
     with tab2:
-        st.subheader("Nearby Essentials")
+        st.subheader(f"Nearby in {selected_location.title()}")
 
-        places = [
-            {"name": "🍛 ABC Tiffin Center", "info": "⭐ 4.3 • ₹50 meal • Open now"},
-            {"name": "🏥 MedPlus Pharmacy", "info": "⭐ 4.5 • Open 24/7"},
-            {"name": "🏋️ Local Gym", "info": "⭐ 4.1 • Budget friendly"},
-            {"name": "🛒 Reliance Smart", "info": "⭐ 4.2 • Groceries"}
-        ]
+        places = nearby_data.get(selected_location, [])
 
-        for place in places:
-            st.markdown(f"### {place['name']}")
-            st.write(place["info"])
-            st.markdown("[🗺️ Open in Google Maps](https://www.google.com/maps)")
-            st.divider()
+        if places:
+            for place in places:
+                st.markdown(f"### {place['name']}")
+                st.write(place["info"])
+                st.markdown("[🗺️ Open in Google Maps](https://www.google.com/maps)")
+                st.divider()
+        else:
+            st.info("No nearby data available")

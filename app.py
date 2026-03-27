@@ -28,7 +28,7 @@ creds = Credentials.from_service_account_info(
 client = gspread.authorize(creds)
 
 # -----------------------
-# OPEN YOUR SHEET (BY KEY)
+# OPEN SHEET (BY KEY)
 # -----------------------
 spreadsheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
@@ -46,7 +46,7 @@ sheet_names = [ws.title for ws in spreadsheet.worksheets()]
 if "orders" in sheet_names:
     order_sheet = spreadsheet.worksheet("orders")
 else:
-    st.error("❌ 'orders' sheet not found. Create it manually.")
+    st.error("❌ 'orders' sheet not found")
     st.stop()
 
 # -----------------------
@@ -129,17 +129,34 @@ if st.session_state.arrived:
 
                     items_text = ", ".join([i["name"] for i in cart])
 
+                    # SAVE ORDER
                     order_sheet.append_row([
                         user_name,
                         user_phone,
                         selected_pg["name"],
                         items_text,
                         total,
-                        "Active",
+                        "Pending Payment",
                         str(datetime.now())
                     ])
 
-                    st.success("🎉 Order placed successfully!")
+                    # UPI PAYMENT
+                    upi_id = "reddyinvites@okicici"
+                    name = "MoveIn Services"
+
+                    upi_link = f"upi://pay?pa={upi_id}&pn={name}&am={total}&cu=INR"
+
+                    st.success("🧾 Order placed! Pay now 👇")
+
+                    st.markdown(f"[💰 Pay via UPI]({upi_link})")
+                    st.warning("⚠️ After payment, click WhatsApp to confirm")
+
+                    # WHATSAPP
+                    message = f"Hello {user_name}, Your order is placed. PG: {selected_pg['name']}, Items: {items_text}, Total: ₹{total}. Pay here: {upi_link}"
+                    whatsapp_url = f"https://wa.me/{user_phone}?text={message.replace(' ', '%20')}"
+
+                    st.markdown(f"[📲 Confirm on WhatsApp]({whatsapp_url})")
+
                     st.session_state.selected_categories = {}
 
                 else:

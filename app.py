@@ -38,7 +38,6 @@ spreadsheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 pg_sheet = spreadsheet.sheet1
 pg_data = pg_sheet.get_all_records()
 
-sheet_names = [ws.title for ws in spreadsheet.worksheets()]
 order_sheet = spreadsheet.worksheet("orders")
 
 # -----------------------
@@ -125,7 +124,7 @@ if st.session_state.arrived:
                         selected_pg["name"],
                         items_text,
                         total,
-                        "Pending Payment",
+                        "Pending Verification",
                         str(datetime.now())
                     ])
 
@@ -137,7 +136,7 @@ if st.session_state.arrived:
                     st.session_state.payment_done = False
 
         # -----------------------
-        # PAYMENT SECTION
+        # PAYMENT + SCREENSHOT
         # -----------------------
         if "current_order" in st.session_state:
 
@@ -169,12 +168,21 @@ if st.session_state.arrived:
                 unsafe_allow_html=True
             )
 
-            # I PAID BUTTON
-            if st.button("✅ I Paid"):
-                st.session_state.payment_done = True
-                st.success("Payment marked as done!")
+            st.warning("⚠️ After payment, upload screenshot")
 
-            # WHATSAPP AFTER PAYMENT
+            # UPLOAD SCREENSHOT
+            st.markdown("### 📸 Upload Payment Screenshot")
+
+            payment_file = st.file_uploader("Upload screenshot", type=["png", "jpg", "jpeg"])
+
+            if payment_file:
+                st.image(payment_file, caption="Uploaded Screenshot", use_column_width=True)
+
+                st.success("✅ Screenshot uploaded! We will verify your payment.")
+
+                st.session_state.payment_done = True
+
+            # WHATSAPP AFTER UPLOAD
             if st.session_state.payment_done:
 
                 message = f"Hello {user_name}, I have completed payment. PG: {selected_pg['name']}, Items: {items_text}, Total: ₹{total}"
@@ -214,16 +222,6 @@ if st.session_state.arrived:
                 st.write(f"🧾 {order['items']} - ₹{order['total']}")
                 st.write(f"📍 {order['pg']}")
                 st.write(f"📌 Status: {order['status']}")
-
-                if order["status"] == "Active":
-                    if st.button("❌ Cancel", key=f"cancel_{i}"):
-
-                        row_index = i + 2
-                        order_sheet.update_cell(row_index, 6, "Cancelled")
-
-                        st.success("Cancelled")
-                        st.rerun()
-
                 st.divider()
 
         else:

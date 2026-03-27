@@ -3,38 +3,6 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
-# -----------------------
-# LOAD GOOGLE SHEET DATA
-# -----------------------
-@st.cache_data
-def load_pg_data():
-    creds_dict = dict(st.secrets["gcp"])
-
-    # Fix keys
-    creds_dict["token_uri"] = "https://oauth2.googleapis.com/token"
-    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-
-    from google.oauth2.service_account import Credentials
-    creds = Credentials.from_service_account_info(
-        creds_dict,
-        scopes=[
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ],
-    )
-
-    client = gspread.authorize(creds)
-
-    sheet = client.open("pg_data").sheet1
-    data = sheet.get_all_records()
-
-    return pd.DataFrame(data)
-
-
-df = load_pg_data()
-pg_list = df.to_dict(orient="records")
-
-# -----------------------
 # SESSION STATE
 # -----------------------
 if "arrived" not in st.session_state:

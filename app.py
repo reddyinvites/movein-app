@@ -8,6 +8,10 @@ from google.oauth2.service_account import Credentials
 scope = ["https://spreadsheets.google.com/feeds",
          "https://www.googleapis.com/auth/drive"]
 
+if "gcp" not in st.secrets:
+    st.error("Missing GCP secrets")
+    st.stop()
+
 creds = Credentials.from_service_account_info(
     st.secrets["gcp"],
     scopes=scope

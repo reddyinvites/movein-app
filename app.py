@@ -1,5 +1,4 @@
 import streamlit as st   # ✅ MUST BE FIRST
-import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
@@ -32,19 +31,20 @@ client = gspread.authorize(creds)
 # LOAD PG DATA
 # -----------------------
 try:
-    pg_sheet = client.open("pg_data").sheet1
-    pg_data = pg_sheet.get_all_records()
-except:
+    sheet = client.open("pg_data").sheet1
+    pg_data = sheet.get_all_records()
+except Exception as e:
+    st.error(f"PG Load Error: {e}")
     pg_data = []
 
 # -----------------------
-# LOAD ORDERS SHEET
+# LOAD ORDERS SHEET (NO CREATE)
 # -----------------------
 try:
     order_sheet = client.open("pg_data").worksheet("orders")
 except:
-    order_sheet = client.open("pg_data").add_worksheet(title="orders", rows="1000", cols="10")
-    order_sheet.append_row(["name", "phone", "pg", "items", "total", "status", "time"])
+    st.error("❌ 'orders' sheet not found. Create it manually.")
+    st.stop()
 
 # -----------------------
 # HEADER
@@ -93,16 +93,18 @@ if st.session_state.arrived:
     with tab1:
 
         kits = [
-            {"name": "Basic Kit", "price": 249, "items": "Bedsheet + Pillow", "category": "basic"},
-            {"name": "Utility Kit", "price": 199, "items": "Bucket + Mug", "category": "utility"},
-            {"name": "Hygiene Kit", "price": 129, "items": "Soap + Toothpaste", "category": "hygiene"},
-            {"name": "Combo Kit", "price": 449, "items": "All items", "category": "combo"}
+            {"name": "🛏️ Basic Kit", "price": 249, "items": "Bedsheet + Pillow", "category": "basic"},
+            {"name": "🪣 Utility Kit", "price": 199, "items": "Bucket + Mug", "category": "utility"},
+            {"name": "🧼 Hygiene Kit", "price": 129, "items": "Soap + Toothpaste", "category": "hygiene"},
+            {"name": "🎁 Combo Kit", "price": 449, "items": "All items", "category": "combo"}
         ]
 
         for kit in kits:
             col1, col2 = st.columns([3,1])
+
             with col1:
                 st.write(f"{kit['name']} - ₹{kit['price']}")
+
             with col2:
                 if st.button("Add", key=kit["name"]):
                     st.session_state.selected_categories[kit["category"]] = kit
@@ -142,23 +144,31 @@ if st.session_state.arrived:
                     st.warning("Enter name & phone")
 
         else:
-            st.info("Cart empty")
+            st.info("Cart is empty")
 
     # =====================
     # 📍 NEARBY
     # =====================
     with tab2:
-        st.write(f"Nearby in {selected_location}")
+        st.subheader(f"Nearby in {selected_location}")
+
+        nearby_data = {
+            "ameerpet": ["🍛 Tiffin Center", "🏥 Pharmacy", "🏋️ Gym"],
+            "madhapur": ["🍛 Mess", "🏥 MedPlus", "🏋️ Cult Gym"],
+            "sr nagar": ["🍛 Tiffins", "🏥 Medical", "🏋️ Gym"]
+        }
+
+        places = nearby_data.get(selected_location, [])
+
+        for place in places:
+            st.write(place)
 
     # =====================
     # 📜 ORDERS
     # =====================
     with tab3:
 
-        try:
-            orders = order_sheet.get_all_records()
-        except:
-            orders = []
+        orders = order_sheet.get_all_records()
 
         user_orders = [o for o in orders if o["phone"] == user_phone]
 
@@ -171,8 +181,11 @@ if st.session_state.arrived:
 
                 if order["status"] == "Active":
                     if st.button("❌ Cancel", key=f"cancel_{i}"):
+
+                        # Find correct row
                         row_index = i + 2
                         order_sheet.update_cell(row_index, 6, "Cancelled")
+
                         st.success("Cancelled")
                         st.rerun()
 

@@ -6,12 +6,12 @@ import cloudinary
 import cloudinary.uploader
 
 # -----------------------
-# CLOUDINARY (FIXED)
+# CLOUDINARY (SECURE)
 # -----------------------
 cloudinary.config(
-    cloud_name="dewe4jasy",
-    api_key="419262333827963",
-    api_secret="LNdeDvC2HK3CJ8D-NGfpCTonZDk"
+    cloud_name=st.secrets["CLOUD_NAME"],
+    api_key=st.secrets["API_KEY"],
+    api_secret=st.secrets["API_SECRET"]
 )
 
 # -----------------------
@@ -133,14 +133,16 @@ elif st.session_state.page == "user":
                     total,
                     "Pending",
                     str(datetime.now()),
-                    ""  # screenshot
+                    ""  # screenshot column
                 ])
 
                 st.session_state.order_done = True
                 st.session_state.total = total
                 st.rerun()
 
+        # -----------------------
         # PAYMENT
+        # -----------------------
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
@@ -162,11 +164,11 @@ elif st.session_state.page == "user":
                 if file:
                     st.image(file, width=200)
 
-                    # UPLOAD TO CLOUDINARY
+                    # Upload to Cloudinary
                     result = cloudinary.uploader.upload(file)
                     image_url = result["secure_url"]
 
-                    # SAVE URL
+                    # Save URL in sheet
                     last_row = len(order_sheet.get_all_values())
                     order_sheet.update_cell(last_row, 8, image_url)
 
@@ -195,7 +197,7 @@ elif st.session_state.page == "admin":
         st.write(f"👤 {o.get('Owner_name')} | 📞 {o.get('phone_number')}")
         st.write(f"🏠 {o.get('pg_name')} | 🛒 {o.get('items')}")
 
-        # SHOW SCREENSHOT
+        # Screenshot display
         if o.get("screenshot"):
             st.success("📸 Screenshot Uploaded")
             st.image(o["screenshot"], width=150)

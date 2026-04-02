@@ -16,7 +16,7 @@ if "arrived" not in st.session_state:
     st.session_state.arrived = False
 
 # -----------------------
-# GOOGLE SHEETS FIXED
+# GOOGLE SHEETS
 # -----------------------
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -31,20 +31,14 @@ client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
-# ✅ SAFE PG LIST FETCH (FIXED)
-pg_sheet = None
-for ws in sheet.worksheets():
-    if ws.title.strip().lower() == "pg_list":
-        pg_sheet = ws
-        break
-
-if pg_sheet is None:
-    st.error("❌ pg_list sheet not found")
-    st.stop()
-
+# ✅ USE Sheet1 AS PG DATA
+pg_sheet = sheet.sheet1
 order_sheet = sheet.worksheet("orders")
 
-pg_data = pg_sheet.get_all_records()
+pg_raw = pg_sheet.get_all_records()
+
+# ✅ Extract unique PG names safely
+pg_data = list(set([row.get("pg") or row.get("name") for row in pg_raw if (row.get("pg") or row.get("name"))]))
 
 # =====================
 # HOME
@@ -73,12 +67,8 @@ elif st.session_state.page == "user":
     name = st.text_input("Name")
     phone = st.text_input("Phone")
 
-    # ✅ FIXED SELECTBOX
-    selected_pg = st.selectbox(
-        "Select PG",
-        pg_data,
-        format_func=lambda x: f"{x['pg_name']} - {x['location']}"
-    )
+    # ✅ SIMPLE SELECTBOX
+    selected_pg = st.selectbox("Select PG", pg_data)
 
     if st.button("📍 I reached PG"):
         st.session_state.arrived = True
@@ -151,11 +141,10 @@ elif st.session_state.page == "user":
 
                 items = ", ".join([i["name"] for i in cart.values()])
 
-                # ✅ FIXED PG NAME
                 order_sheet.append_row([
                     name,
                     phone,
-                    selected_pg["pg_name"],
+                    selected_pg,   # ✅ string
                     items,
                     total,
                     "Pending",

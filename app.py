@@ -2,16 +2,17 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-import base64
+import cloudinary
+import cloudinary.uploader
 
 # -----------------------
-# PAGE STYLE (FONT + UI)
+# PAGE STYLE
 # -----------------------
 st.set_page_config(page_title="Move-in App", layout="wide")
 
 st.markdown("""
 <style>
-html, body, [class*="css"]  {
+html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
 }
 .stButton>button {
@@ -52,6 +53,15 @@ sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
 pg_sheet = sheet.sheet1
 order_sheet = sheet.worksheet("orders")
+
+# -----------------------
+# CLOUDINARY CONFIG
+# -----------------------
+cloudinary.config(
+    cloud_name=st.secrets["CLOUD_NAME"],
+    api_key=st.secrets["API_KEY"],
+    api_secret=st.secrets["API_SECRET"]
+)
 
 # -----------------------
 # LOAD PG DATA
@@ -171,7 +181,7 @@ elif st.session_state.page == "user":
                     total,
                     "Pending",
                     str(datetime.now()),
-                    ""   # screenshot empty
+                    ""  # screenshot
                 ])
 
                 st.session_state.order_done = True
@@ -203,20 +213,21 @@ elif st.session_state.page == "user":
                 file = st.file_uploader("Upload Screenshot", type=["png","jpg","jpeg"])
 
                 if file:
-                    img_bytes = file.read()
-                    img_base64 = base64.b64encode(img_bytes).decode()
+                    st.image(file, width=200)
 
-                    st.image(img_bytes, width=200)
+                    # ✅ Upload to Cloudinary
+                    result = cloudinary.uploader.upload(file)
+                    image_url = result["secure_url"]
 
-                    # save screenshot
+                    # ✅ Save URL
                     last_row = len(order_sheet.get_all_values())
-                    order_sheet.update_cell(last_row, 8, img_base64)
+                    order_sheet.update_cell(last_row, 8, image_url)
 
                     st.success("✅ Screenshot uploaded!")
                     st.info("📲 We will verify and send WhatsApp confirmation.")
 
 # =====================
-# ADMIN
+# ADMIN DASHBOARD
 # =====================
 elif st.session_state.page == "admin":
 
@@ -238,11 +249,10 @@ elif st.session_state.page == "admin":
         st.write(f"👤 {o.get('Owner_name')} | 📞 {o.get('phone_number')}")
         st.write(f"🏠 {o.get('pg_name')} | 🛒 {o.get('items')}")
 
-        # ✅ Screenshot status
+        # ✅ Screenshot display
         if o.get("screenshot"):
             st.success("📸 Screenshot Uploaded")
-            img_bytes = base64.b64decode(o["screenshot"])
-            st.image(img_bytes, width=150)
+            st.image(o["screenshot"], width=150)
         else:
             st.warning("❌ No Screenshot")
 

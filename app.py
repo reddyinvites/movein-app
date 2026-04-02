@@ -31,8 +31,17 @@ client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
-# ✅ UPDATED SHEETS
-pg_sheet = sheet.worksheet("pg_list")   # ✅ NEW
+# ✅ SAFE PG LIST FETCH (FIXED)
+pg_sheet = None
+for ws in sheet.worksheets():
+    if ws.title.strip().lower() == "pg_list":
+        pg_sheet = ws
+        break
+
+if pg_sheet is None:
+    st.error("❌ pg_list sheet not found")
+    st.stop()
+
 order_sheet = sheet.worksheet("orders")
 
 pg_data = pg_sheet.get_all_records()
@@ -142,11 +151,11 @@ elif st.session_state.page == "user":
 
                 items = ", ".join([i["name"] for i in cart.values()])
 
-                # ✅ FIXED HERE
+                # ✅ FIXED PG NAME
                 order_sheet.append_row([
                     name,
                     phone,
-                    selected_pg["pg_name"],   # ✅ corrected
+                    selected_pg["pg_name"],
                     items,
                     total,
                     "Pending",

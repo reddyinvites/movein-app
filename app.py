@@ -24,8 +24,6 @@ scope = [
 ]
 
 gcp_info = dict(st.secrets["gcp_service_account"])
-
-# 🔥 IMPORTANT FIX
 gcp_info["private_key"] = gcp_info["private_key"].replace("\\n", "\n")
 
 creds = Credentials.from_service_account_info(gcp_info, scopes=scope)
@@ -33,7 +31,8 @@ client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
-pg_sheet = sheet.sheet1
+# ✅ UPDATED SHEETS
+pg_sheet = sheet.worksheet("pg_list")   # ✅ NEW
 order_sheet = sheet.worksheet("orders")
 
 pg_data = pg_sheet.get_all_records()
@@ -65,10 +64,11 @@ elif st.session_state.page == "user":
     name = st.text_input("Name")
     phone = st.text_input("Phone")
 
+    # ✅ FIXED SELECTBOX
     selected_pg = st.selectbox(
         "Select PG",
         pg_data,
-        format_func=lambda x: f"{x['name']} - {x['location']}"
+        format_func=lambda x: f"{x['pg_name']} - {x['location']}"
     )
 
     if st.button("📍 I reached PG"):
@@ -142,10 +142,11 @@ elif st.session_state.page == "user":
 
                 items = ", ".join([i["name"] for i in cart.values()])
 
+                # ✅ FIXED HERE
                 order_sheet.append_row([
                     name,
                     phone,
-                    selected_pg["name"],
+                    selected_pg["pg_name"],   # ✅ corrected
                     items,
                     total,
                     "Pending",
@@ -218,7 +219,6 @@ elif st.session_state.page == "admin":
 
         col1, col2 = st.columns(2)
 
-        # APPROVE BUTTON ONLY FOR PENDING
         if o["status"] == "Pending":
             if col1.button("Approve", key=f"a{i}"):
 
@@ -235,7 +235,6 @@ elif st.session_state.page == "admin":
 
                 st.rerun()
 
-        # CANCEL
         if col2.button("Cancel", key=f"c{i}"):
             order_sheet.delete_rows(row_index)
             st.rerun()

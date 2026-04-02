@@ -2,6 +2,25 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+import base64
+
+# -----------------------
+# PAGE STYLE (FONT + UI)
+# -----------------------
+st.set_page_config(page_title="Move-in App", layout="wide")
+
+st.markdown("""
+<style>
+html, body, [class*="css"]  {
+    font-family: 'Poppins', sans-serif;
+}
+.stButton>button {
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-weight: bold;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # -----------------------
 # SESSION INIT
@@ -31,14 +50,11 @@ client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
-# -----------------------
-# SHEETS
-# -----------------------
 pg_sheet = sheet.sheet1
 order_sheet = sheet.worksheet("orders")
 
 # -----------------------
-# LOAD PG DATA (STRICT FIX)
+# LOAD PG DATA
 # -----------------------
 pg_raw = pg_sheet.get_all_records()
 
@@ -154,16 +170,17 @@ elif st.session_state.page == "user":
                     items,
                     total,
                     "Pending",
-                    str(datetime.now())
+                    str(datetime.now()),
+                    ""   # screenshot empty
                 ])
 
                 st.session_state.order_done = True
                 st.session_state.total = total
                 st.rerun()
 
-        # =====================
-        # PAYMENT (UPDATED ONLY)
-        # =====================
+        # -----------------------
+        # PAYMENT
+        # -----------------------
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
@@ -171,40 +188,35 @@ elif st.session_state.page == "user":
 
             st.success("Order placed!")
 
-            # ✅ state for payment click
             if "paid_clicked" not in st.session_state:
                 st.session_state.paid_clicked = False
 
-            # ✅ PAY BUTTON
             if st.button("💰 Pay Now"):
                 st.session_state.paid_clicked = True
                 st.markdown(f"[Click here to Pay]({upi})")
 
-            # ✅ ENABLE UPLOAD AFTER CLICK
             if st.session_state.paid_clicked:
 
                 st.divider()
                 st.write("📤 Upload Payment Screenshot")
 
-                file = st.file_uploader("Upload Screenshot", type=["png", "jpg", "jpeg"])
+                file = st.file_uploader("Upload Screenshot", type=["png","jpg","jpeg"])
 
                 if file:
-                    # ✅ small image
-                    st.image(file, width=200)
+                    img_bytes = file.read()
+                    img_base64 = base64.b64encode(img_bytes).decode()
 
-                    st.success("✅ Screenshot uploaded successfully!")
+                    st.image(img_bytes, width=200)
 
-                    st.info("📲 We will verify your payment and send confirmation on WhatsApp shortly.")
+                    # save screenshot
+                    last_row = len(order_sheet.get_all_values())
+                    order_sheet.update_cell(last_row, 8, img_base64)
 
-                    st.divider()
-
-                    if st.button("🚪 Logout"):
-                        st.session_state.clear()
-                        st.session_state.page = "home"
-                        st.rerun()
+                    st.success("✅ Screenshot uploaded!")
+                    st.info("📲 We will verify and send WhatsApp confirmation.")
 
 # =====================
-# ADMIN DASHBOARD
+# ADMIN
 # =====================
 elif st.session_state.page == "admin":
 
@@ -215,50 +227,23 @@ elif st.session_state.page == "admin":
     if password != "1234":
         st.stop()
 
-    if st.button("🚪 Logout"):
-        st.session_state.clear()
-        st.session_state.page = "home"
-        st.rerun()
-
-    st.divider()
-
     data = order_sheet.get_all_values()
     headers = data[0]
     rows = data[1:]
 
     for i in reversed(range(len(rows))):
 
-        row_index = i + 2
         o = dict(zip(headers, rows[i]))
 
-        st.write(f"👤 {o['owner_name']} | 📞 {o['phone_number']}")
-        st.write(f"🛒 {o['items']} | ₹{o['total']}")
+        st.write(f"👤 {o.get('Owner_name')} | 📞 {o.get('phone_number')}")
+        st.write(f"🏠 {o.get('pg_name')} | 🛒 {o.get('items')}")
 
-        if o["status"] == "Pending":
-            st.warning("Pending")
-        elif o["status"] == "Paid":
-            st.success("Paid")
-
-        col1, col2 = st.columns(2)
-
-        if o["status"] == "Pending":
-            if col1.button("Approve", key=f"a{i}"):
-
-                order_sheet.update_cell(row_index, 6, "Paid")
-
-                msg = f"Hello {o['owner_name']}, your payment confirmed!"
-                wa = f"https://wa.me/{o['phone_number']}?text={msg.replace(' ','%20')}"
-
-                st.markdown(f"""
-                    <script>
-                        window.open("{wa}", "_blank");
-                    </script>
-                """, unsafe_allow_html=True)
-
-                st.rerun()
-
-        if col2.button("Cancel", key=f"c{i}"):
-            order_sheet.delete_rows(row_index)
-            st.rerun()
+        # ✅ Screenshot status
+        if o.get("screenshot"):
+            st.success("📸 Screenshot Uploaded")
+            img_bytes = base64.b64decode(o["screenshot"])
+            st.image(img_bytes, width=150)
+        else:
+            st.warning("❌ No Screenshot")
 
         st.divider()

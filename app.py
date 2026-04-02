@@ -6,13 +6,18 @@ import cloudinary
 import cloudinary.uploader
 
 # -----------------------
-# CLOUDINARY (SECURE)
+# CLOUDINARY (FIXED + SAFE)
 # -----------------------
-cloudinary.config(
-    cloud_name=st.secrets["CLOUD_NAME"],
-    api_key=st.secrets["API_KEY"],
-    api_secret=st.secrets["API_SECRET"]
-)
+try:
+    cloudinary.config(
+        cloud_name=st.secrets["cloudinary"]["cloud_name"],
+        api_key=st.secrets["cloudinary"]["api_key"],
+        api_secret=st.secrets["cloudinary"]["api_secret"]
+    )
+    CLOUDINARY_ENABLED = True
+except Exception as e:
+    CLOUDINARY_ENABLED = False
+    st.warning("⚠️ Cloudinary not configured properly. Image upload disabled.")
 
 # -----------------------
 # SESSION INIT
@@ -164,15 +169,18 @@ elif st.session_state.page == "user":
                 if file:
                     st.image(file, width=200)
 
-                    # Upload to Cloudinary
-                    result = cloudinary.uploader.upload(file)
-                    image_url = result["secure_url"]
+                    if CLOUDINARY_ENABLED:
+                        # Upload to Cloudinary
+                        result = cloudinary.uploader.upload(file)
+                        image_url = result["secure_url"]
 
-                    # Save URL in sheet
-                    last_row = len(order_sheet.get_all_values())
-                    order_sheet.update_cell(last_row, 8, image_url)
+                        # Save URL in sheet
+                        last_row = len(order_sheet.get_all_values())
+                        order_sheet.update_cell(last_row, 8, image_url)
 
-                    st.success("✅ Screenshot uploaded!")
+                        st.success("✅ Screenshot uploaded!")
+                    else:
+                        st.error("❌ Cloudinary not working. Cannot upload image.")
 
 # =====================
 # ADMIN

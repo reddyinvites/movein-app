@@ -3,6 +3,11 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
+# 🔥 AUTO REFRESH (every 2 sec)
+st.set_page_config(page_title="PG App", layout="wide")
+st_autorefresh = st.empty()
+st.experimental_rerun
+
 # -----------------------
 # SESSION INIT
 # -----------------------
@@ -31,14 +36,22 @@ client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
-# ✅ USE Sheet1 AS PG DATA
+# ✅ USE Sheet1 (PG DATA)
 pg_sheet = sheet.sheet1
 order_sheet = sheet.worksheet("orders")
 
 pg_raw = pg_sheet.get_all_records()
 
-# ✅ Extract unique PG names safely
-pg_data = list(set([row.get("pg") or row.get("name") for row in pg_raw if (row.get("pg") or row.get("name"))]))
+# ✅ AUTO DETECT PG COLUMN (NO CHANGE NEEDED IN SHEET)
+pg_data = []
+for row in pg_raw:
+    for key in row:
+        if "pg" in key.lower() or "name" in key.lower():
+            if row[key]:
+                pg_data.append(row[key])
+
+# remove duplicates
+pg_data = list(set(pg_data))
 
 # =====================
 # HOME
@@ -67,7 +80,7 @@ elif st.session_state.page == "user":
     name = st.text_input("Name")
     phone = st.text_input("Phone")
 
-    # ✅ SIMPLE SELECTBOX
+    # ✅ FIXED SELECTBOX
     selected_pg = st.selectbox("Select PG", pg_data)
 
     if st.button("📍 I reached PG"):
@@ -144,7 +157,7 @@ elif st.session_state.page == "user":
                 order_sheet.append_row([
                     name,
                     phone,
-                    selected_pg,   # ✅ string
+                    selected_pg,
                     items,
                     total,
                     "Pending",
@@ -207,7 +220,7 @@ elif st.session_state.page == "admin":
         row_index = i + 2
         o = dict(zip(headers, rows[i]))
 
-        st.write(f"👤 {o['name']} | 📞 {o['phone']}")
+        st.write(f"👤 {o['owner_name']} | 📞 {o['phone_number']}")
         st.write(f"🛒 {o['items']} | ₹{o['total']}")
 
         if o["status"] == "Pending":
@@ -222,8 +235,8 @@ elif st.session_state.page == "admin":
 
                 order_sheet.update_cell(row_index, 6, "Paid")
 
-                msg = f"Hello {o['name']}, your payment is confirmed!"
-                wa = f"https://wa.me/{o['phone']}?text={msg.replace(' ','%20')}"
+                msg = f"Hello {o['owner_name']}, your payment is confirmed!"
+                wa = f"https://wa.me/{o['phone_number']}?text={msg.replace(' ','%20')}"
 
                 st.markdown(f"""
                     <script>

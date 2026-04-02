@@ -31,21 +31,25 @@ client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
-# ✅ SHEETS
+# -----------------------
+# SHEETS
+# -----------------------
 pg_sheet = sheet.sheet1   # Sheet1 = PG data
 order_sheet = sheet.worksheet("orders")
 
-# ✅ LOAD PG DATA (AUTO DETECT COLUMN)
+# -----------------------
+# LOAD PG DATA (STRICT FIX)
+# -----------------------
 pg_raw = pg_sheet.get_all_records()
 
 pg_data = []
 for row in pg_raw:
-    for key in row:
-        if "pg" in key.lower() or "name" in key.lower():
-            if row[key]:
-                pg_data.append(row[key])
+    val = row.get("pg_name") or row.get("pg")
+    if val:
+        pg_data.append(val)
 
-pg_data = list(set(pg_data))  # remove duplicates
+# remove duplicates + sort
+pg_data = sorted(list(set(pg_data)))
 
 # =====================
 # HOME
@@ -74,6 +78,7 @@ elif st.session_state.page == "user":
     name = st.text_input("Name")
     phone = st.text_input("Phone")
 
+    # ✅ FIXED DROPDOWN
     selected_pg = st.selectbox("Select PG", pg_data)
 
     if st.button("📍 I reached PG"):
@@ -96,6 +101,7 @@ elif st.session_state.page == "user":
         combo_selected = "combo" in cart
         others_selected = any(k in cart for k in ["basic","utility","hygiene"])
 
+        # NORMAL ITEMS
         for key in ["basic","utility","hygiene"]:
             p = products[key]
 
@@ -113,6 +119,7 @@ elif st.session_state.page == "user":
                         cart[key] = p
                         st.rerun()
 
+        # COMBO
         p = products["combo"]
         st.write(f"🎁 Combo Kit - ₹{p['price']}")
 
@@ -131,6 +138,7 @@ elif st.session_state.page == "user":
 
         st.divider()
 
+        # CART
         if cart:
             total = sum(i["price"] for i in cart.values())
 
@@ -158,6 +166,7 @@ elif st.session_state.page == "user":
                 st.session_state.total = total
                 st.rerun()
 
+        # PAYMENT
         if st.session_state.get("order_done"):
 
             total = st.session_state.total

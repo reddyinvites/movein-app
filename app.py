@@ -6,7 +6,7 @@ import cloudinary
 import cloudinary.uploader
 
 # -----------------------
-# CLOUDINARY (FIXED + SAFE)
+# CLOUDINARY (SECURE)
 # -----------------------
 try:
     cloudinary.config(
@@ -15,9 +15,8 @@ try:
         api_secret=st.secrets["cloudinary"]["api_secret"]
     )
     CLOUDINARY_ENABLED = True
-except Exception as e:
+except:
     CLOUDINARY_ENABLED = False
-    st.warning("⚠️ Cloudinary not configured properly. Image upload disabled.")
 
 # -----------------------
 # SESSION INIT
@@ -85,7 +84,13 @@ if st.session_state.page == "home":
 # =====================
 elif st.session_state.page == "user":
 
-    st.title("👤 User Dashboard")
+    # ✅ LOGOUT BUTTON ADDED
+    col1, col2 = st.columns([8,2])
+    col1.title("👤 User Dashboard")
+
+    if col2.button("🚪 Logout"):
+        st.session_state.clear()
+        st.rerun()
 
     name = st.text_input("Name")
     phone = st.text_input("Phone")
@@ -138,7 +143,7 @@ elif st.session_state.page == "user":
                     total,
                     "Pending",
                     str(datetime.now()),
-                    ""  # screenshot column
+                    ""
                 ])
 
                 st.session_state.order_done = True
@@ -170,17 +175,26 @@ elif st.session_state.page == "user":
                     st.image(file, width=200)
 
                     if CLOUDINARY_ENABLED:
-                        # Upload to Cloudinary
                         result = cloudinary.uploader.upload(file)
                         image_url = result["secure_url"]
 
-                        # Save URL in sheet
                         last_row = len(order_sheet.get_all_values())
                         order_sheet.update_cell(last_row, 8, image_url)
 
                         st.success("✅ Screenshot uploaded!")
+
+                        # ✅ POPUP MESSAGE
+                        st.success("🎉 We verified your payment. We will confirm your order on your WhatsApp number shortly.")
+
+                        # ✅ CLEAR DATA
+                        st.session_state.cart = {}
+                        st.session_state.arrived = False
+                        st.session_state.order_done = False
+                        st.session_state.paid_clicked = False
+
+                        st.rerun()
                     else:
-                        st.error("❌ Cloudinary not working. Cannot upload image.")
+                        st.error("❌ Cloudinary not working.")
 
 # =====================
 # ADMIN
@@ -205,11 +219,23 @@ elif st.session_state.page == "admin":
         st.write(f"👤 {o.get('Owner_name')} | 📞 {o.get('phone_number')}")
         st.write(f"🏠 {o.get('pg_name')} | 🛒 {o.get('items')}")
 
-        # Screenshot display
         if o.get("screenshot"):
             st.success("📸 Screenshot Uploaded")
             st.image(o["screenshot"], width=150)
         else:
             st.warning("❌ No Screenshot")
+
+        # ✅ APPROVE + DELETE BUTTONS
+        col1, col2 = st.columns(2)
+
+        if col1.button("✅ Approve", key=f"approve{i}"):
+            order_sheet.update_cell(i+2, 6, "Approved")
+            st.success("Order Approved")
+            st.rerun()
+
+        if col2.button("❌ Delete", key=f"delete{i}"):
+            order_sheet.delete_rows(i+2)
+            st.warning("Order Deleted")
+            st.rerun()
 
         st.divider()

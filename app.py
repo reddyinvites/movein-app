@@ -6,22 +6,13 @@ import cloudinary
 import cloudinary.uploader
 
 # -----------------------
-# PAGE STYLE
+# CLOUDINARY (FIXED)
 # -----------------------
-st.set_page_config(page_title="Move-in App", layout="wide")
-
-st.markdown("""
-<style>
-html, body, [class*="css"] {
-    font-family: 'Poppins', sans-serif;
-}
-.stButton>button {
-    border-radius: 10px;
-    padding: 10px 20px;
-    font-weight: bold;
-}
-</style>
-""", unsafe_allow_html=True)
+cloudinary.config(
+    cloud_name="dewe4jasy",
+    api_key="419262333827963",
+    api_secret="LNdeDvC2HK3CJ8D-NGfpCTonZDk"
+)
 
 # -----------------------
 # SESSION INIT
@@ -55,15 +46,6 @@ pg_sheet = sheet.sheet1
 order_sheet = sheet.worksheet("orders")
 
 # -----------------------
-# CLOUDINARY CONFIG
-# -----------------------
-cloudinary.config(
-    cloud_name=st.secrets["CLOUD_NAME"],
-    api_key=st.secrets["API_KEY"],
-    api_secret=st.secrets["API_SECRET"]
-)
-
-# -----------------------
 # LOAD PG DATA
 # -----------------------
 pg_raw = pg_sheet.get_all_records()
@@ -94,7 +76,7 @@ if st.session_state.page == "home":
         st.rerun()
 
 # =====================
-# USER DASHBOARD
+# USER
 # =====================
 elif st.session_state.page == "user":
 
@@ -111,8 +93,6 @@ elif st.session_state.page == "user":
 
     if st.session_state.arrived:
 
-        st.success("Choose your essentials 👇")
-
         cart = st.session_state.cart
 
         products = {
@@ -122,50 +102,22 @@ elif st.session_state.page == "user":
             "combo": {"name": "Combo Kit", "price": 499}
         }
 
-        combo_selected = "combo" in cart
-        others_selected = any(k in cart for k in ["basic","utility","hygiene"])
-
-        for key in ["basic","utility","hygiene"]:
+        for key in products:
             p = products[key]
 
             st.write(f"{p['name']} - ₹{p['price']}")
 
-            if combo_selected:
-                st.button("Add", disabled=True, key=f"d{key}")
-            else:
-                if key in cart:
-                    if st.button("❌ Remove", key=f"r{key}"):
-                        del cart[key]
-                        st.rerun()
-                else:
-                    if st.button("Add", key=f"a{key}"):
-                        cart[key] = p
-                        st.rerun()
-
-        p = products["combo"]
-        st.write(f"🎁 Combo Kit - ₹{p['price']}")
-
-        if "combo" in cart:
-            if st.button("❌ Remove Combo"):
-                del cart["combo"]
-                st.rerun()
-        else:
-            if others_selected:
-                st.button("Add Combo", disabled=True)
-            else:
-                if st.button("Add Combo"):
-                    cart.clear()
-                    cart["combo"] = p
+            if key in cart:
+                if st.button("❌ Remove", key=f"r{key}"):
+                    del cart[key]
                     st.rerun()
-
-        st.divider()
+            else:
+                if st.button("Add", key=f"a{key}"):
+                    cart[key] = p
+                    st.rerun()
 
         if cart:
             total = sum(i["price"] for i in cart.values())
-
-            st.write("🛒 Selected Items:")
-            for i in cart.values():
-                st.write(i["name"])
 
             st.write(f"### Total: ₹{total}")
 
@@ -188,9 +140,7 @@ elif st.session_state.page == "user":
                 st.session_state.total = total
                 st.rerun()
 
-        # -----------------------
         # PAYMENT
-        # -----------------------
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
@@ -207,27 +157,23 @@ elif st.session_state.page == "user":
 
             if st.session_state.paid_clicked:
 
-                st.divider()
-                st.write("📤 Upload Payment Screenshot")
-
-                file = st.file_uploader("Upload Screenshot", type=["png","jpg","jpeg"])
+                file = st.file_uploader("Upload Screenshot")
 
                 if file:
                     st.image(file, width=200)
 
-                    # ✅ Upload to Cloudinary
+                    # UPLOAD TO CLOUDINARY
                     result = cloudinary.uploader.upload(file)
                     image_url = result["secure_url"]
 
-                    # ✅ Save URL
+                    # SAVE URL
                     last_row = len(order_sheet.get_all_values())
                     order_sheet.update_cell(last_row, 8, image_url)
 
                     st.success("✅ Screenshot uploaded!")
-                    st.info("📲 We will verify and send WhatsApp confirmation.")
 
 # =====================
-# ADMIN DASHBOARD
+# ADMIN
 # =====================
 elif st.session_state.page == "admin":
 
@@ -249,7 +195,7 @@ elif st.session_state.page == "admin":
         st.write(f"👤 {o.get('Owner_name')} | 📞 {o.get('phone_number')}")
         st.write(f"🏠 {o.get('pg_name')} | 🛒 {o.get('items')}")
 
-        # ✅ Screenshot display
+        # SHOW SCREENSHOT
         if o.get("screenshot"):
             st.success("📸 Screenshot Uploaded")
             st.image(o["screenshot"], width=150)

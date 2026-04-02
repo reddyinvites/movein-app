@@ -3,11 +3,6 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-# 🔥 AUTO REFRESH (every 2 sec)
-st.set_page_config(page_title="PG App", layout="wide")
-st_autorefresh = st.empty()
-st.experimental_rerun
-
 # -----------------------
 # SESSION INIT
 # -----------------------
@@ -36,13 +31,13 @@ client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 
-# ✅ USE Sheet1 (PG DATA)
-pg_sheet = sheet.sheet1
+# ✅ SHEETS
+pg_sheet = sheet.sheet1   # Sheet1 = PG data
 order_sheet = sheet.worksheet("orders")
 
+# ✅ LOAD PG DATA (AUTO DETECT COLUMN)
 pg_raw = pg_sheet.get_all_records()
 
-# ✅ AUTO DETECT PG COLUMN (NO CHANGE NEEDED IN SHEET)
 pg_data = []
 for row in pg_raw:
     for key in row:
@@ -50,8 +45,7 @@ for row in pg_raw:
             if row[key]:
                 pg_data.append(row[key])
 
-# remove duplicates
-pg_data = list(set(pg_data))
+pg_data = list(set(pg_data))  # remove duplicates
 
 # =====================
 # HOME
@@ -80,7 +74,6 @@ elif st.session_state.page == "user":
     name = st.text_input("Name")
     phone = st.text_input("Phone")
 
-    # ✅ FIXED SELECTBOX
     selected_pg = st.selectbox("Select PG", pg_data)
 
     if st.button("📍 I reached PG"):
@@ -103,7 +96,6 @@ elif st.session_state.page == "user":
         combo_selected = "combo" in cart
         others_selected = any(k in cart for k in ["basic","utility","hygiene"])
 
-        # NORMAL ITEMS
         for key in ["basic","utility","hygiene"]:
             p = products[key]
 
@@ -121,7 +113,6 @@ elif st.session_state.page == "user":
                         cart[key] = p
                         st.rerun()
 
-        # COMBO
         p = products["combo"]
         st.write(f"🎁 Combo Kit - ₹{p['price']}")
 
@@ -140,7 +131,6 @@ elif st.session_state.page == "user":
 
         st.divider()
 
-        # CART
         if cart:
             total = sum(i["price"] for i in cart.values())
 
@@ -168,7 +158,6 @@ elif st.session_state.page == "user":
                 st.session_state.total = total
                 st.rerun()
 
-        # PAYMENT
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
@@ -183,7 +172,7 @@ elif st.session_state.page == "user":
                 st.image(file)
 
                 st.success("✅ Upload successful!")
-                st.info("📲 Your payment will be verified and you will receive a confirmation message on WhatsApp within a few minutes.")
+                st.info("📲 Payment will be verified soon.")
 
                 st.divider()
 
@@ -235,7 +224,7 @@ elif st.session_state.page == "admin":
 
                 order_sheet.update_cell(row_index, 6, "Paid")
 
-                msg = f"Hello {o['owner_name']}, your payment is confirmed!"
+                msg = f"Hello {o['owner_name']}, your payment confirmed!"
                 wa = f"https://wa.me/{o['phone_number']}?text={msg.replace(' ','%20')}"
 
                 st.markdown(f"""

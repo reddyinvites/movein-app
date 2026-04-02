@@ -34,7 +34,7 @@ sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 # -----------------------
 # SHEETS
 # -----------------------
-pg_sheet = sheet.sheet1   # Sheet1 = PG data
+pg_sheet = sheet.sheet1
 order_sheet = sheet.worksheet("orders")
 
 # -----------------------
@@ -48,7 +48,6 @@ for row in pg_raw:
     if val:
         pg_data.append(val)
 
-# remove duplicates + sort
 pg_data = sorted(list(set(pg_data)))
 
 # =====================
@@ -78,7 +77,6 @@ elif st.session_state.page == "user":
     name = st.text_input("Name")
     phone = st.text_input("Phone")
 
-    # ✅ FIXED DROPDOWN
     selected_pg = st.selectbox("Select PG", pg_data)
 
     if st.button("📍 I reached PG"):
@@ -101,7 +99,6 @@ elif st.session_state.page == "user":
         combo_selected = "combo" in cart
         others_selected = any(k in cart for k in ["basic","utility","hygiene"])
 
-        # NORMAL ITEMS
         for key in ["basic","utility","hygiene"]:
             p = products[key]
 
@@ -119,7 +116,6 @@ elif st.session_state.page == "user":
                         cart[key] = p
                         st.rerun()
 
-        # COMBO
         p = products["combo"]
         st.write(f"🎁 Combo Kit - ₹{p['price']}")
 
@@ -138,7 +134,6 @@ elif st.session_state.page == "user":
 
         st.divider()
 
-        # CART
         if cart:
             total = sum(i["price"] for i in cart.values())
 
@@ -166,29 +161,47 @@ elif st.session_state.page == "user":
                 st.session_state.total = total
                 st.rerun()
 
-        # PAYMENT
+        # =====================
+        # PAYMENT (UPDATED ONLY)
+        # =====================
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
             upi = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
 
             st.success("Order placed!")
-            st.markdown(f"[💰 Pay Now]({upi})")
 
-            file = st.file_uploader("Upload Payment Screenshot")
+            # ✅ state for payment click
+            if "paid_clicked" not in st.session_state:
+                st.session_state.paid_clicked = False
 
-            if file:
-                st.image(file)
+            # ✅ PAY BUTTON
+            if st.button("💰 Pay Now"):
+                st.session_state.paid_clicked = True
+                st.markdown(f"[Click here to Pay]({upi})")
 
-                st.success("✅ Upload successful!")
-                st.info("📲 Payment will be verified soon.")
+            # ✅ ENABLE UPLOAD AFTER CLICK
+            if st.session_state.paid_clicked:
 
                 st.divider()
+                st.write("📤 Upload Payment Screenshot")
 
-                if st.button("🚪 Logout"):
-                    st.session_state.clear()
-                    st.session_state.page = "home"
-                    st.rerun()
+                file = st.file_uploader("Upload Screenshot", type=["png", "jpg", "jpeg"])
+
+                if file:
+                    # ✅ small image
+                    st.image(file, width=200)
+
+                    st.success("✅ Screenshot uploaded successfully!")
+
+                    st.info("📲 We will verify your payment and send confirmation on WhatsApp shortly.")
+
+                    st.divider()
+
+                    if st.button("🚪 Logout"):
+                        st.session_state.clear()
+                        st.session_state.page = "home"
+                        st.rerun()
 
 # =====================
 # ADMIN DASHBOARD

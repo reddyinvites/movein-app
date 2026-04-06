@@ -94,14 +94,17 @@ elif st.session_state.page == "user":
     name = st.text_input("👤 Name")
     phone = st.text_input("📞 Phone (+91XXXXXXXXXX)")
 
-    # ✅ PHONE VALIDATION
-    if phone and not (phone.startswith("+91") and len(phone) == 13 and phone[3:].isdigit()):
-        st.error("Enter valid phone number like +919876543210 ❌")
-        st.stop()
+    # PHONE VALIDATION
+    valid_phone = False
+    if phone:
+        if phone.startswith("+91") and len(phone) == 13 and phone[3:].isdigit():
+            valid_phone = True
+        else:
+            st.error("Enter valid phone number like +919876543210 ❌")
 
     selected_pg = st.selectbox("🏠 Select PG", pg_data)
 
-    if st.button("📍 I reached PG"):
+    if st.button("📍 I reached PG", disabled=not (name and valid_phone)):
         st.session_state.arrived = True
         st.rerun()
 
@@ -110,10 +113,26 @@ elif st.session_state.page == "user":
         cart = st.session_state.cart
 
         products = {
-            "basic": {"name": "Basic Kit", "price": 249},
-            "utility": {"name": "Utility Kit", "price": 199},
-            "hygiene": {"name": "Hygiene Kit", "price": 129},
-            "combo": {"name": "Combo Kit", "price": 499}
+            "basic": {
+                "name": "Basic Kit",
+                "price": 249,
+                "items": "Bucket, Mug, Pillow, Bedsheet"
+            },
+            "utility": {
+                "name": "Utility Kit",
+                "price": 199,
+                "items": "Cleaning Brush, Washing Powder, Cloth Clips"
+            },
+            "hygiene": {
+                "name": "Hygiene Kit",
+                "price": 129,
+                "items": "Soap, Shampoo, Toothpaste, Sanitizer"
+            },
+            "combo": {
+                "name": "Combo Kit",
+                "price": 499,
+                "items": "All items from Basic + Utility + Hygiene"
+            }
         }
 
         st.subheader("🛍️ Select Your Kits")
@@ -126,7 +145,8 @@ elif st.session_state.page == "user":
             with col1:
                 st.markdown(f"""
                 **{p['name']}**  
-                💰 ₹{p['price']}
+                💰 ₹{p['price']}  
+                📦 {p['items']}
                 """)
 
             with col2:
@@ -144,10 +164,17 @@ elif st.session_state.page == "user":
         # TOTAL
         if cart:
             total = sum(i["price"] for i in cart.values())
-
             st.markdown(f"## 💳 Total: ₹{total}")
 
             if st.button("🚀 Place Order"):
+
+                # DUPLICATE CHECK
+                existing = order_sheet.get_all_records()
+                phones = [str(x.get("phone_number")) for x in existing]
+
+                if phone in phones:
+                    st.error("❌ You already placed an order with this number")
+                    st.stop()
 
                 items = ", ".join([i["name"] for i in cart.values()])
 
@@ -166,14 +193,13 @@ elif st.session_state.page == "user":
                 st.session_state.total = total
                 st.rerun()
 
-        # ================= PAYMENT =================
+        # PAYMENT
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
 
             st.success("✅ Order placed!")
 
-            # ✅ DIRECT UPI OPEN
             upi_link = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
 
             st.markdown(f"""
@@ -184,9 +210,9 @@ elif st.session_state.page == "user":
             </a>
             """, unsafe_allow_html=True)
 
-            st.info("After payment, upload screenshot below 👇")
+            st.info("After payment, upload screenshot 👇")
 
-            file = st.file_uploader("📤 Upload Payment Screenshot")
+            file = st.file_uploader("📤 Upload Screenshot")
 
             if file:
                 st.image(file, width=200)
@@ -201,9 +227,7 @@ elif st.session_state.page == "user":
                     st.success("✅ Screenshot uploaded!")
                     st.success("📲 We will verify your payment and confirm on your WhatsApp number.")
 
-                    # CLEAR ALL
-                    st.session_state.clear()
-                    st.rerun()
+                    st.warning("👉 Please click Logout after confirmation")
 
                 else:
                     st.error("Cloudinary not working ❌")

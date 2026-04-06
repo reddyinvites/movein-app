@@ -112,6 +112,7 @@ elif st.session_state.page == "user":
 
         cart = st.session_state.cart
 
+        # PRODUCTS
         products = {
             "basic": {
                 "name": "Basic Kit",
@@ -137,6 +138,10 @@ elif st.session_state.page == "user":
 
         st.subheader("🛍️ Select Your Kits")
 
+        # COMBO LOGIC
+        combo_selected = "combo" in cart
+        single_selected = any(k in cart for k in ["basic", "utility", "hygiene"])
+
         for key in products:
             p = products[key]
 
@@ -150,12 +155,21 @@ elif st.session_state.page == "user":
                 """)
 
             with col2:
+
+                disabled = False
+
+                if key == "combo" and single_selected:
+                    disabled = True
+
+                if key in ["basic", "utility", "hygiene"] and combo_selected:
+                    disabled = True
+
                 if key in cart:
                     if st.button("❌ Remove", key=f"r{key}"):
                         del cart[key]
                         st.rerun()
                 else:
-                    if st.button("➕ Add", key=f"a{key}"):
+                    if st.button("➕ Add", key=f"a{key}", disabled=disabled):
                         cart[key] = p
                         st.rerun()
 
@@ -231,6 +245,12 @@ elif st.session_state.page == "user":
 
                 else:
                     st.error("Cloudinary not working ❌")
+
+    # BOTTOM LOGOUT
+    st.markdown("---")
+    if st.button("🚪 Logout (Exit)"):
+        st.session_state.clear()
+        st.rerun()
 
 # =====================
 # ADMIN

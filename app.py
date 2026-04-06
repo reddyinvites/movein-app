@@ -82,13 +82,16 @@ elif st.session_state.page == "user":
     name = st.text_input("👤 Name")
     phone = st.text_input("📞 Phone (+91XXXXXXXXXX)")
 
-    # PHONE VALIDATION
+    # VALIDATION
     valid_phone = False
     if phone:
         if phone.startswith("+91") and len(phone) == 13 and phone[3:].isdigit():
             valid_phone = True
         else:
-            st.error("Enter valid phone number like +919876543210 ❌")
+            st.error("Enter valid phone number ❌")
+
+    if not name:
+        st.warning("Name is required ⚠️")
 
     selected_pg = st.selectbox("🏠 Select PG", pg_data)
 
@@ -110,7 +113,7 @@ elif st.session_state.page == "user":
         st.subheader("🛍️ Select Your Kits")
 
         combo_selected = "combo" in cart
-        single_selected = any(k in cart for k in ["basic", "utility", "hygiene"])
+        single_selected = any(k in cart for k in ["basic","utility","hygiene"])
 
         for key in products:
             p = products[key]
@@ -144,11 +147,15 @@ elif st.session_state.page == "user":
 
             if st.button("🚀 Place Order"):
 
-                existing = order_sheet.get_all_records()
-                phones = [str(x.get("phone_number")) for x in existing]
+                if not name:
+                    st.error("Name required ❌")
+                    st.stop()
 
-                if phone in phones:
-                    st.error("❌ Already ordered with this number")
+                existing = order_sheet.get_all_records()
+                phones = [str(x.get("phone_number")).strip() for x in existing]
+
+                if phone.strip() in phones:
+                    st.error("❌ Only one order allowed per number")
                     st.stop()
 
                 items = ", ".join([i["name"] for i in cart.values()])
@@ -162,7 +169,6 @@ elif st.session_state.page == "user":
                 st.session_state.total = total
                 st.rerun()
 
-        # PAYMENT
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
@@ -176,7 +182,7 @@ elif st.session_state.page == "user":
             💰 Pay Now</button></a>
             """, unsafe_allow_html=True)
 
-            st.info("Upload payment screenshot 👇")
+            st.info("Upload screenshot 👇")
 
             file = st.file_uploader("📤 Upload Screenshot")
 
@@ -192,7 +198,6 @@ elif st.session_state.page == "user":
 
                     st.success("✅ Uploaded!")
                     st.success("📲 We will confirm on WhatsApp")
-
                     st.warning("Click logout after confirmation")
 
     st.markdown("---")
@@ -218,7 +223,10 @@ elif st.session_state.page == "admin":
 
         o = dict(zip(headers, rows[i]))
 
-        name = o.get("Owner_name") or o.get("name") or "No Name"
+        name = o.get("Owner_name") or ""
+        if not name or name.lower() == "none":
+            name = "❌ Missing Name"
+
         phone = o.get("phone_number") or ""
         pg = o.get("pg_name") or ""
         items = o.get("items") or ""

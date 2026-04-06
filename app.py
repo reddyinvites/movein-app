@@ -5,9 +5,7 @@ from datetime import datetime
 import cloudinary
 import cloudinary.uploader
 
-# -----------------------
-# CLOUDINARY
-# -----------------------
+# ---------------- CLOUDINARY ----------------
 try:
     cloudinary.config(
         cloud_name=st.secrets["cloudinary"]["cloud_name"],
@@ -18,9 +16,7 @@ try:
 except:
     CLOUDINARY_ENABLED = False
 
-# -----------------------
-# SESSION INIT
-# -----------------------
+# ---------------- SESSION ----------------
 if "page" not in st.session_state:
     st.session_state.page = "home"
 
@@ -30,9 +26,7 @@ if "cart" not in st.session_state:
 if "arrived" not in st.session_state:
     st.session_state.arrived = False
 
-# -----------------------
-# GOOGLE SHEETS
-# -----------------------
+# ---------------- GOOGLE SHEETS ----------------
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -49,9 +43,7 @@ sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q")
 pg_sheet = sheet.sheet1
 order_sheet = sheet.worksheet("orders")
 
-# -----------------------
-# LOAD PG DATA
-# -----------------------
+# ---------------- LOAD PG ----------------
 pg_raw = pg_sheet.get_all_records()
 
 pg_data = []
@@ -62,9 +54,7 @@ for row in pg_raw:
 
 pg_data = sorted(list(set(pg_data)))
 
-# =====================
-# HOME
-# =====================
+# ================= HOME =================
 if st.session_state.page == "home":
 
     st.title("🏠 Move-in Assistant")
@@ -79,9 +69,7 @@ if st.session_state.page == "home":
         st.session_state.page = "admin"
         st.rerun()
 
-# =====================
-# USER
-# =====================
+# ================= USER =================
 elif st.session_state.page == "user":
 
     col1, col2 = st.columns([8,2])
@@ -112,33 +100,15 @@ elif st.session_state.page == "user":
 
         cart = st.session_state.cart
 
-        # PRODUCTS
         products = {
-            "basic": {
-                "name": "Basic Kit",
-                "price": 249,
-                "items": "Bucket, Mug, Pillow, Bedsheet"
-            },
-            "utility": {
-                "name": "Utility Kit",
-                "price": 199,
-                "items": "Cleaning Brush, Washing Powder, Cloth Clips"
-            },
-            "hygiene": {
-                "name": "Hygiene Kit",
-                "price": 129,
-                "items": "Soap, Shampoo, Toothpaste, Sanitizer"
-            },
-            "combo": {
-                "name": "Combo Kit",
-                "price": 499,
-                "items": "All items from Basic + Utility + Hygiene"
-            }
+            "basic": {"name": "Basic Kit", "price": 249, "items": "Bucket, Mug, Pillow, Bedsheet"},
+            "utility": {"name": "Utility Kit", "price": 199, "items": "Cleaning Brush, Washing Powder, Cloth Clips"},
+            "hygiene": {"name": "Hygiene Kit", "price": 129, "items": "Soap, Shampoo, Toothpaste, Sanitizer"},
+            "combo": {"name": "Combo Kit", "price": 499, "items": "All items combined"}
         }
 
         st.subheader("🛍️ Select Your Kits")
 
-        # COMBO LOGIC
         combo_selected = "combo" in cart
         single_selected = any(k in cart for k in ["basic", "utility", "hygiene"])
 
@@ -148,20 +118,13 @@ elif st.session_state.page == "user":
             col1, col2 = st.columns([3,1])
 
             with col1:
-                st.markdown(f"""
-                **{p['name']}**  
-                💰 ₹{p['price']}  
-                📦 {p['items']}
-                """)
+                st.markdown(f"**{p['name']}**  \n💰 ₹{p['price']}  \n📦 {p['items']}")
 
             with col2:
-
                 disabled = False
-
                 if key == "combo" and single_selected:
                     disabled = True
-
-                if key in ["basic", "utility", "hygiene"] and combo_selected:
+                if key in ["basic","utility","hygiene"] and combo_selected:
                     disabled = True
 
                 if key in cart:
@@ -175,32 +138,24 @@ elif st.session_state.page == "user":
 
             st.divider()
 
-        # TOTAL
         if cart:
             total = sum(i["price"] for i in cart.values())
             st.markdown(f"## 💳 Total: ₹{total}")
 
             if st.button("🚀 Place Order"):
 
-                # DUPLICATE CHECK
                 existing = order_sheet.get_all_records()
                 phones = [str(x.get("phone_number")) for x in existing]
 
                 if phone in phones:
-                    st.error("❌ You already placed an order with this number")
+                    st.error("❌ Already ordered with this number")
                     st.stop()
 
                 items = ", ".join([i["name"] for i in cart.values()])
 
                 order_sheet.append_row([
-                    name,
-                    phone,
-                    selected_pg,
-                    items,
-                    total,
-                    "Pending",
-                    str(datetime.now()),
-                    ""
+                    name, phone, selected_pg, items,
+                    total, "Pending", str(datetime.now()), ""
                 ])
 
                 st.session_state.order_done = True
@@ -211,20 +166,17 @@ elif st.session_state.page == "user":
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
-
             st.success("✅ Order placed!")
 
             upi_link = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
 
             st.markdown(f"""
             <a href="{upi_link}">
-                <button style="background-color:#28a745;color:white;padding:10px 20px;border:none;border-radius:8px;">
-                    💰 Pay Now
-                </button>
-            </a>
+            <button style="background:#28a745;color:white;padding:10px;border:none;border-radius:8px;">
+            💰 Pay Now</button></a>
             """, unsafe_allow_html=True)
 
-            st.info("After payment, upload screenshot 👇")
+            st.info("Upload payment screenshot 👇")
 
             file = st.file_uploader("📤 Upload Screenshot")
 
@@ -238,23 +190,17 @@ elif st.session_state.page == "user":
                     last_row = len(order_sheet.get_all_values())
                     order_sheet.update_cell(last_row, 8, image_url)
 
-                    st.success("✅ Screenshot uploaded!")
-                    st.success("📲 We will verify your payment and confirm on your WhatsApp number.")
+                    st.success("✅ Uploaded!")
+                    st.success("📲 We will confirm on WhatsApp")
 
-                    st.warning("👉 Please click Logout after confirmation")
+                    st.warning("Click logout after confirmation")
 
-                else:
-                    st.error("Cloudinary not working ❌")
-
-    # BOTTOM LOGOUT
     st.markdown("---")
     if st.button("🚪 Logout (Exit)"):
         st.session_state.clear()
         st.rerun()
 
-# =====================
-# ADMIN
-# =====================
+# ================= ADMIN =================
 elif st.session_state.page == "admin":
 
     st.title("👨‍💼 Admin Dashboard")
@@ -272,23 +218,40 @@ elif st.session_state.page == "admin":
 
         o = dict(zip(headers, rows[i]))
 
-        st.write(f"👤 {o.get('Owner_name')} | 📞 {o.get('phone_number')}")
-        st.write(f"🏠 {o.get('pg_name')} | 🛒 {o.get('items')}")
+        name = o.get("Owner_name") or o.get("name") or "No Name"
+        phone = o.get("phone_number") or ""
+        pg = o.get("pg_name") or ""
+        items = o.get("items") or ""
+        status = o.get("status") or ""
+
+        st.write(f"👤 {name} | 📞 {phone}")
+        st.write(f"🏠 {pg} | 🛒 {items}")
 
         if o.get("screenshot"):
             st.success("📸 Screenshot Uploaded")
             st.image(o["screenshot"], width=150)
+
+        col1, col2, col3 = st.columns(3)
+
+        if status == "Approved":
+            col1.success("✅ Approved")
         else:
-            st.warning("❌ No Screenshot")
-
-        col1, col2 = st.columns(2)
-
-        if col1.button("✅ Approve", key=f"approve{i}"):
-            order_sheet.update_cell(i+2, 6, "Approved")
-            st.rerun()
+            if col1.button("✅ Approve", key=f"approve{i}"):
+                order_sheet.update_cell(i+2, 6, "Approved")
+                st.rerun()
 
         if col2.button("❌ Delete", key=f"delete{i}"):
             order_sheet.delete_rows(i+2)
             st.rerun()
+
+        if phone:
+            msg = f"Hi {name}, your order is confirmed ✅\nItems: {items}"
+            wa = f"https://wa.me/{phone.replace('+','')}?text={msg}"
+
+            col3.markdown(f"""
+            <a href="{wa}" target="_blank">
+            <button style="background:#25D366;color:white;padding:8px;border:none;border-radius:6px;">
+            💬 WhatsApp</button></a>
+            """, unsafe_allow_html=True)
 
         st.divider()

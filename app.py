@@ -6,7 +6,7 @@ import cloudinary
 import cloudinary.uploader
 
 # -----------------------
-# CLOUDINARY (SECURE)
+# CLOUDINARY
 # -----------------------
 try:
     cloudinary.config(
@@ -84,7 +84,6 @@ if st.session_state.page == "home":
 # =====================
 elif st.session_state.page == "user":
 
-    # ✅ LOGOUT BUTTON ADDED
     col1, col2 = st.columns([8,2])
     col1.title("👤 User Dashboard")
 
@@ -92,10 +91,15 @@ elif st.session_state.page == "user":
         st.session_state.clear()
         st.rerun()
 
-    name = st.text_input("Name")
-    phone = st.text_input("Phone")
+    name = st.text_input("👤 Name")
+    phone = st.text_input("📞 Phone (+91XXXXXXXXXX)")
 
-    selected_pg = st.selectbox("Select PG", pg_data)
+    # ✅ PHONE VALIDATION
+    if phone and not (phone.startswith("+91") and len(phone) == 13 and phone[3:].isdigit()):
+        st.error("Enter valid phone number like +919876543210 ❌")
+        st.stop()
+
+    selected_pg = st.selectbox("🏠 Select PG", pg_data)
 
     if st.button("📍 I reached PG"):
         st.session_state.arrived = True
@@ -112,26 +116,38 @@ elif st.session_state.page == "user":
             "combo": {"name": "Combo Kit", "price": 499}
         }
 
+        st.subheader("🛍️ Select Your Kits")
+
         for key in products:
             p = products[key]
 
-            st.write(f"{p['name']} - ₹{p['price']}")
+            col1, col2 = st.columns([3,1])
 
-            if key in cart:
-                if st.button("❌ Remove", key=f"r{key}"):
-                    del cart[key]
-                    st.rerun()
-            else:
-                if st.button("Add", key=f"a{key}"):
-                    cart[key] = p
-                    st.rerun()
+            with col1:
+                st.markdown(f"""
+                **{p['name']}**  
+                💰 ₹{p['price']}
+                """)
 
+            with col2:
+                if key in cart:
+                    if st.button("❌ Remove", key=f"r{key}"):
+                        del cart[key]
+                        st.rerun()
+                else:
+                    if st.button("➕ Add", key=f"a{key}"):
+                        cart[key] = p
+                        st.rerun()
+
+            st.divider()
+
+        # TOTAL
         if cart:
             total = sum(i["price"] for i in cart.values())
 
-            st.write(f"### Total: ₹{total}")
+            st.markdown(f"## 💳 Total: ₹{total}")
 
-            if st.button("Place Order"):
+            if st.button("🚀 Place Order"):
 
                 items = ", ".join([i["name"] for i in cart.values()])
 
@@ -150,51 +166,47 @@ elif st.session_state.page == "user":
                 st.session_state.total = total
                 st.rerun()
 
-        # -----------------------
-        # PAYMENT
-        # -----------------------
+        # ================= PAYMENT =================
         if st.session_state.get("order_done"):
 
             total = st.session_state.total
-            upi = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
 
-            st.success("Order placed!")
+            st.success("✅ Order placed!")
 
-            if "paid_clicked" not in st.session_state:
-                st.session_state.paid_clicked = False
+            # ✅ DIRECT UPI OPEN
+            upi_link = f"upi://pay?pa=reddyinvites@okicici&pn=MoveIn&am={total}"
 
-            if st.button("💰 Pay Now"):
-                st.session_state.paid_clicked = True
-                st.markdown(f"[Click here to Pay]({upi})")
+            st.markdown(f"""
+            <a href="{upi_link}">
+                <button style="background-color:#28a745;color:white;padding:10px 20px;border:none;border-radius:8px;">
+                    💰 Pay Now
+                </button>
+            </a>
+            """, unsafe_allow_html=True)
 
-            if st.session_state.paid_clicked:
+            st.info("After payment, upload screenshot below 👇")
 
-                file = st.file_uploader("Upload Screenshot")
+            file = st.file_uploader("📤 Upload Payment Screenshot")
 
-                if file:
-                    st.image(file, width=200)
+            if file:
+                st.image(file, width=200)
 
-                    if CLOUDINARY_ENABLED:
-                        result = cloudinary.uploader.upload(file)
-                        image_url = result["secure_url"]
+                if CLOUDINARY_ENABLED:
+                    result = cloudinary.uploader.upload(file)
+                    image_url = result["secure_url"]
 
-                        last_row = len(order_sheet.get_all_values())
-                        order_sheet.update_cell(last_row, 8, image_url)
+                    last_row = len(order_sheet.get_all_values())
+                    order_sheet.update_cell(last_row, 8, image_url)
 
-                        st.success("✅ Screenshot uploaded!")
+                    st.success("✅ Screenshot uploaded!")
+                    st.success("📲 We will verify your payment and confirm on your WhatsApp number.")
 
-                        # ✅ POPUP MESSAGE
-                        st.success("🎉 We verified your payment. We will confirm your order on your WhatsApp number shortly.")
+                    # CLEAR ALL
+                    st.session_state.clear()
+                    st.rerun()
 
-                        # ✅ CLEAR DATA
-                        st.session_state.cart = {}
-                        st.session_state.arrived = False
-                        st.session_state.order_done = False
-                        st.session_state.paid_clicked = False
-
-                        st.rerun()
-                    else:
-                        st.error("❌ Cloudinary not working.")
+                else:
+                    st.error("Cloudinary not working ❌")
 
 # =====================
 # ADMIN
@@ -225,17 +237,14 @@ elif st.session_state.page == "admin":
         else:
             st.warning("❌ No Screenshot")
 
-        # ✅ APPROVE + DELETE BUTTONS
         col1, col2 = st.columns(2)
 
         if col1.button("✅ Approve", key=f"approve{i}"):
             order_sheet.update_cell(i+2, 6, "Approved")
-            st.success("Order Approved")
             st.rerun()
 
         if col2.button("❌ Delete", key=f"delete{i}"):
             order_sheet.delete_rows(i+2)
-            st.warning("Order Deleted")
             st.rerun()
 
         st.divider()

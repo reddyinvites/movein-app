@@ -5,6 +5,26 @@ from datetime import datetime
 import cloudinary
 import cloudinary.uploader
 
+# ---------------- UI STYLE ----------------
+st.set_page_config(page_title="Move-in Assistant", layout="centered")
+
+st.markdown("""
+<style>
+.big-title {
+    text-align:center;
+    font-size:32px;
+    font-weight:700;
+    margin-bottom:20px;
+}
+.card {
+    padding:15px;
+    border-radius:12px;
+    background:#f8f9fa;
+    margin-bottom:10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ---------------- CLOUDINARY ----------------
 try:
     cloudinary.config(
@@ -57,15 +77,15 @@ pg_data = sorted(list(set(pg_data)))
 # ================= HOME =================
 if st.session_state.page == "home":
 
-    st.title("🏠 Move-in Assistant")
+    st.markdown('<div class="big-title">🏠 Move-in Assistant</div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
-    if col1.button("👤 User"):
+    if col1.button("👤 User", use_container_width=True):
         st.session_state.page = "user"
         st.rerun()
 
-    if col2.button("👨‍💼 Admin"):
+    if col2.button("👨‍💼 Admin", use_container_width=True):
         st.session_state.page = "admin"
         st.rerun()
 
@@ -73,7 +93,7 @@ if st.session_state.page == "home":
 elif st.session_state.page == "user":
 
     col1, col2 = st.columns([8,2])
-    col1.title("👤 User Dashboard")
+    col1.markdown("## 👤 User Dashboard")
 
     if col2.button("🚪 Logout"):
         st.session_state.clear()
@@ -82,7 +102,6 @@ elif st.session_state.page == "user":
     name = st.text_input("👤 Name")
     phone = st.text_input("📞 Phone (+91XXXXXXXXXX)")
 
-    # VALIDATION
     valid_phone = False
     if phone:
         if phone.startswith("+91") and len(phone) == 13 and phone[3:].isdigit():
@@ -121,7 +140,13 @@ elif st.session_state.page == "user":
             col1, col2 = st.columns([3,1])
 
             with col1:
-                st.markdown(f"**{p['name']}**  \n💰 ₹{p['price']}  \n📦 {p['items']}")
+                st.markdown(f"""
+                <div class="card">
+                <b>{p['name']}</b><br>
+                💰 ₹{p['price']}<br>
+                📦 {p['items']}
+                </div>
+                """, unsafe_allow_html=True)
 
             with col2:
                 disabled = False
@@ -139,17 +164,11 @@ elif st.session_state.page == "user":
                         cart[key] = p
                         st.rerun()
 
-            st.divider()
-
         if cart:
             total = sum(i["price"] for i in cart.values())
             st.markdown(f"## 💳 Total: ₹{total}")
 
             if st.button("🚀 Place Order"):
-
-                if not name:
-                    st.error("Name required ❌")
-                    st.stop()
 
                 existing = order_sheet.get_all_records()
                 phones = [str(x.get("phone_number")).strip() for x in existing]
@@ -161,8 +180,9 @@ elif st.session_state.page == "user":
                 items = ", ".join([i["name"] for i in cart.values()])
 
                 order_sheet.append_row([
-                    name, phone, selected_pg, items,
-                    total, "Pending", str(datetime.now()), ""
+                    name.strip(), phone.strip(), selected_pg,
+                    items, total, "Pending",
+                    str(datetime.now()), ""
                 ])
 
                 st.session_state.order_done = True
@@ -182,8 +202,6 @@ elif st.session_state.page == "user":
             💰 Pay Now</button></a>
             """, unsafe_allow_html=True)
 
-            st.info("Upload screenshot 👇")
-
             file = st.file_uploader("📤 Upload Screenshot")
 
             if file:
@@ -198,7 +216,6 @@ elif st.session_state.page == "user":
 
                     st.success("✅ Uploaded!")
                     st.success("📲 We will confirm on WhatsApp")
-                    st.warning("Click logout after confirmation")
 
     st.markdown("---")
     if st.button("🚪 Logout (Exit)"):
@@ -208,7 +225,12 @@ elif st.session_state.page == "user":
 # ================= ADMIN =================
 elif st.session_state.page == "admin":
 
-    st.title("👨‍💼 Admin Dashboard")
+    col1, col2 = st.columns([8,2])
+    col1.markdown("## 👨‍💼 Admin Dashboard")
+
+    if col2.button("🚪 Logout"):
+        st.session_state.clear()
+        st.rerun()
 
     password = st.text_input("Password", type="password")
 
@@ -223,8 +245,8 @@ elif st.session_state.page == "admin":
 
         o = dict(zip(headers, rows[i]))
 
-        name = o.get("Owner_name") or ""
-        if not name or name.lower() == "none":
+        name = str(o.get("Owner_name")).strip()
+        if not name or name.lower() in ["none", "nan"]:
             name = "❌ Missing Name"
 
         phone = o.get("phone_number") or ""
